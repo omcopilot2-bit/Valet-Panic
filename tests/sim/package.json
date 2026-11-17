@@ -1,0 +1,1 @@
+{"name":"valet-sim","private":true,"type":"module","description":"Headless liveness test for the Shifts logic","devDependencies":{"three":"^0.187.0"}}
