@@ -280,6 +280,38 @@ body[data-mode=rush] .objective[data-info="1"] p{display:block}
 /* hide the ugly scrollbar on cards (still scrolls by wheel / touch) */
 .hero{scrollbar-width:none;-ms-overflow-style:none}
 .hero::-webkit-scrollbar{display:none}
+/* Touch: no text selection, copy / paste bubbles, image callouts or double-tap zoom while playing */
+html,body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+button,canvas,.overlay{-webkit-touch-callout:none;touch-action:manipulation}
+/* Mobile controls: steering wheel + gas / brake while driving, joystick while on foot */
+.mobile-controls{--u:1;inset:auto max(14px,env(safe-area-inset-right)) max(14px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left));touch-action:none}
+.mobile-controls,.mobile-controls *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:none}
+.ctl-left{position:relative;width:calc(168px*var(--u));height:calc(168px*var(--u));pointer-events:none}
+.joy,.wheel{position:absolute;inset:0;border-radius:50%;pointer-events:auto}
+.joy{display:none;background:radial-gradient(circle,#0a182299 0 55%,#0a182266 100%);border:2px solid #ffffff4d}
+.joy-knob{position:absolute;left:50%;top:50%;width:44%;height:44%;border-radius:50%;background:var(--gold);box-shadow:0 5px 0 var(--gold-d);transform:translate(-50%,-50%);pointer-events:none}
+body[data-ctl=foot] .joy{display:block}
+body[data-ctl=foot] .wheel{display:none}
+.wheel-rim{position:absolute;inset:5%;border-radius:50%;border:calc(15px*var(--u)) solid #0a1822e6;box-shadow:0 0 0 2px #ffffff55,inset 0 0 0 2px #ffffff30,0 6px 0 #06101a;pointer-events:none;will-change:transform}
+.wheel-rim:before{content:'';position:absolute;left:0;right:0;top:50%;height:calc(13px*var(--u));margin-top:calc(-6px*var(--u));background:#0a1822e6}
+.wheel-rim:after{content:'';position:absolute;left:50%;top:50%;bottom:0;width:calc(13px*var(--u));margin-left:calc(-6px*var(--u));background:#0a1822e6}
+.wheel-rim i{position:absolute;left:50%;top:calc(-15px*var(--u));width:calc(12px*var(--u));height:calc(15px*var(--u));margin-left:calc(-6px*var(--u));border-radius:4px;background:var(--gold);z-index:1}
+.wheel-rim b{position:absolute;left:50%;top:50%;width:30%;height:30%;transform:translate(-50%,-50%);border-radius:50%;background:#0a1822;border:3px solid var(--gold);z-index:1}
+.ctl-right{display:flex;flex-direction:column;align-items:flex-end;gap:10px;pointer-events:none}
+.ctl-top{display:flex;gap:10px;align-items:flex-end}
+.mobile-park{width:calc(112px*var(--u));height:calc(64px*var(--u));font-size:calc(24px*var(--u));border-radius:22px}
+body[data-ctl=foot] .mobile-park{width:calc(156px*var(--u));height:calc(120px*var(--u));font-size:calc(30px*var(--u));border-radius:32px}
+.mobile-honk{width:calc(80px*var(--u));height:calc(64px*var(--u));font-size:calc(18px*var(--u))}
+body[data-ctl=foot] .mobile-honk{display:none}
+.pedals{display:flex;gap:12px;align-items:flex-end;pointer-events:none}
+body[data-ctl=foot] .pedals{display:none}
+.pedal{pointer-events:auto;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:0;border:2px solid #ffffff55;border-radius:24px;font-family:'Fredoka','Trebuchet MS','Segoe UI',system-ui,sans-serif;font-weight:700;font-size:calc(19px*var(--u));-webkit-tap-highlight-color:transparent;transition:transform .06s,box-shadow .06s,filter .06s}
+.pedal small{font:800 calc(9px*var(--u))/1 'Nunito','Segoe UI',system-ui,sans-serif;letter-spacing:.1em;opacity:.85}
+.pedal.gas{width:calc(88px*var(--u));height:calc(128px*var(--u));background:linear-gradient(#6df0b4,#2fae7c);color:#062a1b;box-shadow:0 7px 0 #1f9467}
+.pedal.brake{width:calc(72px*var(--u));height:calc(92px*var(--u));background:linear-gradient(#ff8a7e,#d6483b);color:#fff;box-shadow:0 7px 0 #a83a31}
+.pedal.down{transform:translateY(5px);box-shadow:0 2px 0 #0008;filter:brightness(1.15)}
+@media(max-height:480px){.mobile-controls{--u:.78}}
+@media(max-width:400px) and (orientation:portrait){.mobile-controls{--u:.88}}
 </style>
 <script type="importmap">{"imports":{"three":"./assets/three/three.module.js"}}</script>
 </head><body class="menu">
@@ -298,7 +330,16 @@ body[data-mode=rush] .objective[data-info="1"] p{display:block}
 <div class="pickup-banner" id="pickup"><div class="owner" id="ownerText">A guest is waiting</div><div class="plate" id="plateText">PLEASE RETURN THEIR CAR</div></div>
 
 <footer class="bottom"><div class="instruction"><span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span><span class="instruction-text">Drive</span><span class="key space">SPACE</span><span class="instruction-text">Park</span><span class="key">CLICK</span><span class="instruction-text">Return keys</span></div></footer>
-<div class="mobile-controls"><div class="pad"><button data-key="ArrowUp" aria-label="Forward">↑</button><button data-key="ArrowLeft" aria-label="Steer left">←</button><button data-key="ArrowDown" aria-label="Reverse">↓</button><button data-key="ArrowRight" aria-label="Steer right">→</button></div><div class="pad-right"><button class="mobile-honk" id="honkBtn" aria-label="Honk">HONK</button><button class="mobile-park" id="parkBtn">PARK</button></div></div>
+<div class="mobile-controls">
+<div class="ctl-left">
+<div class="joy" id="joy" aria-label="Move"><div class="joy-knob" id="joyKnob"></div></div>
+<div class="wheel" id="wheel" aria-label="Steering wheel"><div class="wheel-rim" id="wheelRim"><i></i><b></b></div></div>
+</div>
+<div class="ctl-right">
+<div class="ctl-top"><button class="mobile-honk" id="honkBtn" aria-label="Honk">HONK</button><button class="mobile-park" id="parkBtn">PARK</button></div>
+<div class="pedals"><button class="pedal brake" id="brakeBtn" aria-label="Brake and reverse">BRAKE<small>REVERSE</small></button><button class="pedal gas" id="gasBtn" aria-label="Gas">GAS</button></div>
+</div>
+</div>
 <div class="toast" id="toast" role="status"></div>
 
 <div class="overlay title" id="overlay"><div class="hero"><div class="hero-eyebrow">Nocturne Hotel · Valet Club</div><h1>Valet<br><em>Panic!</em></h1><p>Park the guests' cars, hand them back, and out-valet the rival.</p><div class="best-line" id="bestLine"></div><div class="profile" id="profileLine"></div><div class="modes"><div class="mode"><button class="play rush" id="startRush">Loading…</button><span class="mode-desc">DUEL · START HERE · BEAT THE RIVAL VALET, SHIFT BY SHIFT</span></div><div class="mode"><button class="play" id="start">Loading…</button><span class="mode-desc">MEMORY · park it, remember it, return the right car</span></div></div><div class="title-links"><button class="link" id="tutorialBtn">▶ How to play</button><button class="link" id="levelsBtn">📋 All shifts</button><button class="link" id="locker">🎒 Locker</button><button class="link" id="logBtn">📊 Copy playtest log</button></div><div class="hero-foot">WASD / arrows to move · run up to a car to hop in · Space to park</div></div></div>

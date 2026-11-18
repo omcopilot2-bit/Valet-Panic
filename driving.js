@@ -4,7 +4,7 @@ import { BOUNDS, PARKED_HALF, reduceMotion } from './config.js';
 import { audio, bayYaw, gripOf, parkRadius, parkSpeed, toast } from './core.js';
 import { puff } from './fx.js';
 import { rushBump } from './shifts.js';
-import { cars, G, keys, rush, slots } from './state.js';
+import { cars, G, keys, rush, slots, touch } from './state.js';
 
 export function angleToBay(car) {
   const Y = bayYaw(car.yaw);   // either direction counts: front-in or back-in
@@ -113,8 +113,8 @@ export function drive(car, dt) {
   const back = keys.has('ArrowDown') || keys.has('s');
   const left = keys.has('ArrowLeft') || keys.has('a');
   const right = keys.has('ArrowRight') || keys.has('d');
-  const throttle = (forward ? 1 : 0) - (back ? 1 : 0);
-  const steer = (left ? 1 : 0) - (right ? 1 : 0);
+  const throttle = THREE.MathUtils.clamp((forward ? 1 : 0) - (back ? 1 : 0) + (touch.gas ? 1 : 0) - (touch.brake ? 1 : 0), -1, 1);
+  const steer = THREE.MathUtils.clamp((left ? 1 : 0) - (right ? 1 : 0) + touch.steer, -1, 1);   // the wheel gives analog steering
   const q = car.quirk;
   const fX = Math.sin(car.yaw), fZ = Math.cos(car.yaw);
   const nitro = G.mode === 'rush' && rush.nitro > 0;
@@ -159,7 +159,7 @@ export function drive(car, dt) {
     if (d < parkRadius() * 1.3 && car.speed < parkSpeed() * 1.5) {
       const Yb = bayYaw(car.yaw);
       const diff = Math.atan2(Math.sin(Yb - car.yaw), Math.cos(Yb - car.yaw));
-      if (Math.abs(diff) < 1.3) car.yaw += diff * Math.min(1, dt * 2.2) * (steer ? 0.3 : 1);
+      if (Math.abs(diff) < 1.3) car.yaw += diff * Math.min(1, dt * 2.2) * (Math.abs(steer) > 0.1 ? 0.3 : 1);
       if (throttle === 0 && d < parkRadius()) {
         const pull = Math.min(1, dt * 1.2);
         car.x += dx * pull;

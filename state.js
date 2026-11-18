@@ -83,4 +83,7 @@ export const tutorial = { on: false, step: '', dist: 0, spawned: false, doneAt: 
 
 export const keys = new Set();
 
+// Touch controls: steering wheel (steer: +1 = full left, -1 = full right), gas / brake pedals and the on-foot joystick (jx / jz in -1..1, screen directions).
+export const touch = { steer: 0, gas: false, brake: false, jx: 0, jz: 0 };
+
 export const tut = { arrive: false, pickup: false, done: false, rushDone: false };

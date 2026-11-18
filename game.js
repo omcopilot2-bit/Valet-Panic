@@ -5,7 +5,7 @@ import { parkCar, start, updateClassic, updateHUD } from './classic.js';
 import { LEVELS, reduceMotion } from './config.js';
 import { addFx, audio, camera, clock, followCam, markAllSlots, renderer, scene, toast } from './core.js';
 import { animateCars, updateFx } from './fx.js';
-import { addControls, renderSoundButton } from './input.js';
+import { addControls, renderSoundButton, syncControls } from './input.js';
 import { addPauseUI, applyCosmetics, setTitleButtons, showLevelSelect, updateBestLine } from './menus.js';
 import { updateFigures } from './people.js';
 import * as platform from './platform.js';
@@ -26,6 +26,7 @@ tut.done = save.tut.classic;
 tut.rushDone = save.tut.rush;
 
 function update(dt) {
+  syncControls();
   if (!G.paused) { updateFigures(dt); updateFx(dt); animateCars(dt); }
   updateRushRings();
   if (G.running && !G.paused && G.mode === 'rush') {

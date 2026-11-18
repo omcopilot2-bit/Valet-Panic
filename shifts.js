@@ -13,7 +13,7 @@ import * as platform from './platform.js';
 import { addXp, levelBest, logRun, persist, recordLevel, save, submitScore } from './progress.js';
 import { applyLevelLayout, clearToken, closePerkPicker, collectToken, fireEvent, nearMiss, offerShiftIntro, spawnToken, tokenDelay, tokenTexture, updateLevelProps } from './shifts-world.js';
 import { approachPoint, deliverRoute, footRoute, grabRadius, parkRoute } from './routes.js';
-import { cars, G, hooks, keys, newRushStats, resetPerks, rush, slots, tut, tutorial } from './state.js';
+import { cars, G, hooks, keys, newRushStats, resetPerks, rush, slots, touch, tut, tutorial } from './state.js';
 
 const rushDrain = () => (1 / Math.max(6, 11 - (rush.level - 1) * 0.5)) * (1 - 0.2 * rush.perks.combo);   // meter empties in 7s, shrinking to 3.5s
 
@@ -367,13 +367,14 @@ const carCircleDist = (car, x, z) => {
 function updateFoot(dt) {
   const pl = rush.pl;
   if (!pl || pl.mode !== 'foot') { rush.near = null; rush.enterT = 0; guide.visible = false; return; }
-  const kx = (keys.has('ArrowRight') || keys.has('d') ? 1 : 0) - (keys.has('ArrowLeft') || keys.has('a') ? 1 : 0);
-  const kz = (keys.has('ArrowDown') || keys.has('s') ? 1 : 0) - (keys.has('ArrowUp') || keys.has('w') ? 1 : 0);
+  const kx = (keys.has('ArrowRight') || keys.has('d') ? 1 : 0) - (keys.has('ArrowLeft') || keys.has('a') ? 1 : 0) + touch.jx;
+  const kz = (keys.has('ArrowDown') || keys.has('s') ? 1 : 0) - (keys.has('ArrowUp') || keys.has('w') ? 1 : 0) + touch.jz;
   const len = Math.hypot(kx, kz);
   const sp = (rush.nitro > 0 ? 7 : 4.8) * (rush.coffee > 0 ? 1.35 : 1) * (1 + 0.12 * rush.perks.legs);
   if (len > 0) {
-    pl.x += kx / len * sp * dt;
-    pl.z += kz / len * sp * dt;
+    const mag = Math.min(1, len);   // the joystick is analog: a gentle push walks slower
+    pl.x += kx / len * sp * mag * dt;
+    pl.z += kz / len * sp * mag * dt;
     pl.yaw = Math.atan2(kx, kz);
   }
   const r = 0.3;
