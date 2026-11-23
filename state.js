@@ -6,6 +6,7 @@ import { SLOT_POSITIONS } from './world.js';
 export const G = {
   colliders: [],
   soundOn: undefined,
+  platformMuted: false,
   running: false,
   paused: false,
   phase: 'arrival', // arrival | parked | pickup | exit | over
@@ -32,9 +33,6 @@ export const G = {
   punch: 0,
   mode: 'classic', // 'classic' | 'rush'
   bestRush: 0,
-  rngCars: Math.random,
-  rngTok: Math.random,
-  rngMisc: Math.random, // Seeded random streams (the Daily Run gives every player the same cars and power-up timings).
   toastTimer: 0,
   coachTimer: 0,
   coachEl: null,
@@ -61,14 +59,21 @@ export const newRushStats = () => ({ crashes: 0, comboLost: 0, guestsLost: 0, ke
 
 export const rush = {
   lv: LEVELS[0],                    // the shift being played
+  sceneLab: false,
   level: 1, elapsed: 0, chain: 0, meter: 0, mult: 1, maxMult: 1, parked: 0,
   spawnIn: 0, nextSlot: null, nitro: 0, boost: 0, token: null, tokenIn: 28,
-  hudT: 0, lastTick: -1, fullWarned: false, autoT: 0, readyAt: 0,
+  hudT: 0, lastTick: -1, fullWarned: false, autoT: 0,
   delivered: 0, calls: [],          // guests waiting at the PICK-UP curb (several at higher levels)
   waiting: null, inbound: null, pl: null, near: null, rival: null, stallT: 0,   // rival: the AI valet you race (null in the tutorial)
-  daily: false, picking: false, musicT: 0, stats: newRushStats(),
+  arrived: 0, guestTotal: 0, doneT: null, closingNoted: false, endNext: null, mini: null,
+  enterT: 0, stillT: 0, lastPark: null, hornCd: 0, doorT: 0, doorman: null,     // on-foot / park timers and the lobby doorman
+  eventIn: 0, wedding: 0, vipNext: 0, coffee: 0, perfectStreak: 0,   // random events and boons
+  picking: false, musicT: 0, stats: newRushStats(),
   perks: Object.fromEntries(RUSH_PERKS.map((p) => [p.key, 0])),
 };
+
+// The rival's tally: every park and every return counts one point.
+export const rivalScore = () => (rush.rival ? rush.rival.parked + rush.rival.delivered : 0);
 
 // The clock can only be topped up a little (power-up, Extra Time boon).
 export const rushCap = () => rush.lv.secs + 8 * rush.perks.time + 10;
@@ -83,7 +88,8 @@ export const tutorial = { on: false, step: '', dist: 0, spawned: false, doneAt: 
 
 export const keys = new Set();
 
-// Touch controls: steering wheel (steer: +1 = full left, -1 = full right), gas / brake pedals and the on-foot joystick (jx / jz in -1..1, screen directions).
-export const touch = { steer: 0, gas: false, brake: false, jx: 0, jz: 0 };
+// How the movement keys are labelled in hints (ZQSD on a French keyboard).
+export const layout = { move: 'WASD' };
+
 
 export const tut = { arrive: false, pickup: false, done: false, rushDone: false };

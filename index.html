@@ -3,10 +3,13 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0a1822">
 <title>Valet Panic</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="preload" href="./assets/fonts/fredoka-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="./assets/fonts/nunito-latin.woff2" as="font" type="font/woff2" crossorigin>
 <style>
 :root{--cream:#fff7e6;--muted:#a9bdc9;--gold:#ffc247;--gold-d:#b27a00;--sky:#6cc8ff;--sky-d:#2a7cab;--mint:#5ee6a8;--coral:#ff6b5e;--night:#0a1822;--panel:#0a1822e6;--line:#ffffff24;--ink:#2a1b00}
 *{box-sizing:border-box}
+@font-face{font-family:Fredoka;src:url("./assets/fonts/fredoka-latin.woff2") format("woff2");font-style:normal;font-weight:500 700;font-display:swap;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:Nunito;src:url("./assets/fonts/nunito-latin.woff2") format("woff2");font-style:normal;font-weight:600 800;font-display:swap;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
 html,body{width:100%;height:100%;margin:0;overflow:hidden;background:var(--night);color:var(--cream);font-family:'Nunito','Segoe UI',system-ui,sans-serif;font-weight:700}
 button{font-family:inherit}
 #game{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
@@ -14,7 +17,8 @@ button{font-family:inherit}
 .grain{display:none}
 
 /* HUD */
-.hud{position:fixed;top:20px;left:24px;display:flex;gap:10px;z-index:2;pointer-events:none}
+:root{--safe-top:var(--safe-area-inset-top,0px);--safe-right:var(--safe-area-inset-right,0px);--safe-bottom:var(--safe-area-inset-bottom,0px);--safe-left:var(--safe-area-inset-left,0px)}
+.hud{position:fixed;top:calc(20px + var(--safe-top));left:calc(24px + var(--safe-left));display:flex;gap:10px;z-index:2;pointer-events:none}
 .metric{min-width:112px;padding:10px 16px;border-radius:18px;background:var(--panel);border:2px solid var(--line)}
 .metric label{display:block;font:800 12px/1 'Nunito','Segoe UI',system-ui,sans-serif;letter-spacing:.1em;color:var(--muted)}
 .metric strong{display:block;margin-top:6px;font:700 34px/1 'Fredoka','Trebuchet MS','Segoe UI',system-ui,sans-serif;color:var(--cream)}
@@ -22,23 +26,24 @@ button{font-family:inherit}
 .metric #streak{color:var(--mint)}
 .metric #lives{color:var(--coral);letter-spacing:.06em}
 .metric #streak.hot{color:var(--gold);text-shadow:0 0 14px #ffc24788}
-.jar{position:fixed;top:98px;left:24px;z-index:2;width:220px;height:26px;border-radius:999px;background:var(--panel);border:2px solid var(--line);overflow:hidden;pointer-events:none}
+.jar{position:fixed;top:calc(98px + var(--safe-top));left:calc(24px + var(--safe-left));z-index:2;width:220px;height:26px;border-radius:999px;background:var(--panel);border:2px solid var(--line);overflow:hidden;pointer-events:none}
 .jar i{position:absolute;inset:0 auto 0 0;width:0;background:linear-gradient(90deg,var(--gold-d),var(--gold));transition:width .3s}
 .jar span{position:relative;display:block;text-align:center;font:800 11px/22px 'Nunito','Segoe UI',system-ui,sans-serif;letter-spacing:.1em;color:var(--cream);text-shadow:0 1px 0 #0a1822}
 .jar.pop{animation:jarpop .5s}
 @keyframes jarpop{50%{transform:scale(1.1);border-color:var(--gold)}}
 .swatch{display:inline-block;width:.8em;height:.8em;border-radius:50%;border:2px solid var(--cream);margin:0 .35em 0 .1em;vertical-align:-.05em}
-.top-right{position:fixed;top:20px;right:24px;z-index:2;display:flex;gap:10px;align-items:center}
+.top-right{position:fixed;top:calc(20px + var(--safe-top));right:calc(24px + var(--safe-right));z-index:2;display:flex;gap:10px;align-items:center}
 .shift-chip{height:52px;padding:0 18px;display:flex;align-items:center;gap:12px;border-radius:18px;background:var(--panel);border:2px solid var(--line);pointer-events:none}
 .shift-chip #step{font:600 18px/1 'Fredoka','Trebuchet MS','Segoe UI',system-ui,sans-serif;white-space:nowrap}
 .bar{width:96px;height:12px;border-radius:999px;background:#ffffff24;overflow:hidden}
 .bar i{display:block;height:100%;width:0;border-radius:999px;background:var(--mint);transition:width .3s}
 .sound{pointer-events:auto;cursor:pointer;color:var(--cream);background:var(--panel);border:2px solid var(--line);width:52px;height:52px;padding:0;border-radius:50%;display:grid;place-items:center;font-size:22px}
 .sound:hover{border-color:var(--gold);color:var(--gold)}
+.sound:disabled{opacity:.55;cursor:not-allowed}
 .sound:focus-visible,.play:focus-visible,.pad button:focus-visible{outline:3px solid var(--sky);outline-offset:3px}
 
 /* Brief card (top centre) */
-.objective{position:fixed;top:100px;left:50%;transform:translateX(-50%);z-index:2;width:min(480px,92vw);padding:14px 22px;border-radius:24px;background:var(--gold);color:var(--ink);box-shadow:0 8px 0 var(--gold-d);pointer-events:none;transition:background .25s,box-shadow .25s}
+.objective{position:fixed;top:calc(100px + var(--safe-top));left:50%;transform:translateX(-50%);z-index:2;width:min(480px,92vw);padding:14px 22px;border-radius:24px;background:var(--gold);color:var(--ink);box-shadow:0 8px 0 var(--gold-d);pointer-events:none;transition:background .25s,box-shadow .25s}
 .objective[data-mode=pickup]{background:var(--sky);color:#06202f;box-shadow:0 8px 0 var(--sky-d)}
 .objective[data-mode=exit]{background:var(--mint);color:#062a1b;box-shadow:0 8px 0 #1f9467}
 .objective-head,.objective h2,.objective .divider,.section-label,.call-icon{display:none}
@@ -48,24 +53,25 @@ button{font-family:inherit}
 .callout{display:block}
 
 /* Pickup banner */
-.pickup-banner{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);z-index:2;pointer-events:none;text-align:center;opacity:0;transition:opacity .3s;padding:12px 24px;border-radius:20px;background:var(--night);border:2px solid var(--sky);min-width:340px}
+.pickup-banner{position:fixed;left:50%;bottom:calc(96px + var(--safe-bottom));transform:translateX(-50%);z-index:2;pointer-events:none;text-align:center;opacity:0;transition:opacity .3s;padding:12px 24px;border-radius:20px;background:var(--night);border:2px solid var(--sky);min-width:340px}
 .pickup-banner.show{opacity:1}
 .pickup-banner .owner{font:700 22px/1.1 'Fredoka','Trebuchet MS','Segoe UI',system-ui,sans-serif;color:var(--cream)}
 .pickup-banner .plate{display:block;margin-top:6px;color:var(--sky);font:800 13px/1 'Nunito','Segoe UI',system-ui,sans-serif;letter-spacing:.1em}
 
 /* Key hints */
-.bottom{position:fixed;left:24px;bottom:22px;z-index:2;pointer-events:none}
+.bottom{position:fixed;left:calc(24px + var(--safe-left));bottom:calc(22px + var(--safe-bottom));z-index:2;pointer-events:none}
 .instruction{display:flex;align-items:center;gap:8px;height:60px;padding:0 20px;border-radius:20px;background:var(--panel);border:2px solid var(--line)}
 .key{min-width:34px;height:34px;padding:0 10px;display:grid;place-items:center;border-radius:9px;background:var(--cream);color:var(--night);font:800 15px/1 'Nunito','Segoe UI',system-ui,sans-serif;box-shadow:0 3px 0 #9fb0ba}
 .key.space{background:var(--gold);color:var(--ink);box-shadow:0 3px 0 var(--gold-d)}
 .instruction-text{margin:0 8px 0 4px;color:#e8f1f5;font:700 15px/1 'Nunito','Segoe UI',system-ui,sans-serif}
 
 body.menu .hud,body.menu .jar,body.menu .objective,body.menu .pickup-banner,body.menu .bottom,body.menu .mobile-controls,body.menu .shift-chip{visibility:hidden}
+body.menu #pauseBtn{display:none}
 /* Overlay + cards */
-.overlay{position:fixed;inset:0;z-index:6;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,#06101acc,#06101ae6);transition:opacity .35s,visibility .35s}
+.overlay{position:fixed;inset:0;padding:calc(12px + var(--safe-top)) calc(12px + var(--safe-right)) calc(12px + var(--safe-bottom)) calc(12px + var(--safe-left));z-index:6;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,#06101acc,#06101ae6);transition:opacity .35s,visibility .35s}
 .overlay.hide{opacity:0;visibility:hidden;pointer-events:none}
-#overlay.title{justify-content:flex-start;padding-left:max(24px,6vw);background:linear-gradient(90deg,#081620f2 0,#081620e0 42%,#08162040 78%,#08162000 100%)}
-.hero{width:min(600px,92vw);max-height:94vh;overflow:auto;padding:34px 40px 38px;text-align:center;background:#14303f;border:3px solid var(--gold);border-radius:32px;box-shadow:0 12px 0 var(--night),0 30px 80px #0008}
+#overlay.title{justify-content:flex-start;padding-left:max(calc(24px + var(--safe-left)),6vw);padding-right:calc(12px + var(--safe-right));background:linear-gradient(90deg,#081620f2 0,#081620e0 42%,#08162040 78%,#08162000 100%)}
+.hero{width:min(600px,92vw);max-height:calc(100vh - var(--safe-top) - var(--safe-bottom) - 24px);overflow:auto;padding:34px 40px 38px;text-align:center;background:#14303f;border:3px solid var(--gold);border-radius:32px;box-shadow:0 12px 0 var(--night),0 30px 80px #0008}
 #overlay.title .hero{text-align:left;background:transparent;border:0;box-shadow:none;padding:0;width:min(620px,92vw)}
 .hero-eyebrow{display:inline-flex;align-items:center;height:32px;padding:0 14px;border-radius:999px;background:#6cc8ff2e;color:var(--sky);font:800 12px/1 'Nunito','Segoe UI',system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase}
 .hero h1{margin:16px 0 0;font:700 clamp(46px,9vw,64px)/1 'Fredoka','Trebuchet MS','Segoe UI',system-ui,sans-serif;color:var(--cream)}
@@ -94,6 +100,13 @@ body.menu .hud,body.menu .jar,body.menu .objective,body.menu .pickup-banner,body
 .play.ghost{height:52px;margin-top:14px;font-size:21px;background:transparent;color:var(--cream);border:2px solid var(--line);box-shadow:none}
 .play.ghost:hover{border-color:var(--gold);color:var(--gold)}
 .play.ghost:active{transform:none}
+#adBlock{display:none;position:fixed;inset:0;z-index:80;cursor:wait;align-items:center;justify-content:center;background:#0a182299;color:#fff7e6;font:700 20px 'Fredoka',system-ui,sans-serif}
+#adBlock.show{display:flex}
+.play.reward{height:64px;font-size:26px;margin-top:18px}
+.play.rush#next,.play.rush#again{font-size:26px}
+.play.reward:disabled{opacity:.5;cursor:wait}
+.adnote{margin-top:8px;text-align:center;font-size:14px;color:var(--cream);opacity:.85}
+.adnote:empty{display:none}
 .perks{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:22px}
 .perk{display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:16px 14px;text-align:left;cursor:pointer;color:var(--cream);background:var(--panel);border:2px solid var(--line);border-radius:20px;box-shadow:0 6px 0 #06101a;transition:transform .1s,border-color .1s}
 .perk:hover{border-color:var(--gold);transform:translateY(-2px)}
@@ -121,7 +134,7 @@ body[data-mode=rush] .metric #lives{color:var(--sky);letter-spacing:0}
 @keyframes float{to{opacity:0;transform:translateY(-44px)}}
 
 /* Touch controls */
-.mobile-controls{display:none;position:fixed;inset:auto 14px 14px;z-index:3;pointer-events:none;justify-content:space-between;align-items:end}
+.mobile-controls{display:none;position:fixed;inset:auto calc(14px + var(--safe-right)) calc(14px + var(--safe-bottom)) calc(14px + var(--safe-left));z-index:3;pointer-events:none;justify-content:space-between;align-items:end}
 .pad{display:grid;grid-template-columns:repeat(3,64px);grid-template-rows:64px 64px;gap:6px;pointer-events:auto}
 .pad button{display:grid;place-items:center;padding:0;border:2px solid #ffffff4d;border-radius:18px;background:#0a1822d1;color:var(--cream);font:700 28px/1 'Fredoka','Trebuchet MS','Segoe UI',system-ui,sans-serif;touch-action:none;-webkit-tap-highlight-color:transparent}
 .pad button:active{background:var(--gold);color:var(--ink)}
@@ -133,24 +146,24 @@ body[data-mode=rush] .metric #lives{color:var(--sky);letter-spacing:0}
 .mobile-honk:active{background:var(--sky);color:#06202f}
 body[data-mode=rush] .mobile-honk{display:block}
 
-@media(max-width:900px),(pointer:coarse){
+@media(max-width:900px){
  .instruction{display:none}
  .mobile-controls{display:flex}
- .pickup-banner{bottom:auto;top:178px;min-width:0;width:min(420px,92vw)}
+ .pickup-banner{bottom:auto;top:calc(178px + var(--safe-top));min-width:0;width:min(420px,92vw)}
 }
 @media(max-width:900px){
- .hud{top:10px;left:10px;gap:6px}
+ .hud{top:calc(10px + var(--safe-top));left:calc(10px + var(--safe-left));gap:6px}
  .metric{min-width:0;padding:6px 10px;border-radius:14px}
  .metric label{font-size:9px}
  .metric strong{font-size:22px;margin-top:3px}
- .top-right{top:10px;right:10px;gap:6px}
+ .top-right{top:calc(10px + var(--safe-top));right:calc(10px + var(--safe-right));gap:6px}
  .shift-chip{display:none}
  .jar{display:none}
  .perks{grid-template-columns:1fr}
  .perk{flex-direction:row;flex-wrap:wrap;align-items:center}
  .perk em{margin:0 0 0 auto}
  .sound{width:46px;height:46px}
- .objective{top:70px;padding:8px 14px;border-radius:18px}
+ .objective{top:calc(70px + var(--safe-top));padding:8px 14px;border-radius:18px}
  .call-main{font-size:20px}
  .call-label{font-size:10px}
  .objective p{display:none}
@@ -162,13 +175,25 @@ body[data-mode=rush] .mobile-honk{display:block}
  .play{height:64px;font-size:26px}
  .toast{font-size:17px}
 }
+body[data-device="desktop"] .mobile-controls{display:none!important}
+body[data-device="mobile"] .mobile-controls,body[data-device="tablet"] .mobile-controls{display:flex}
+body[data-device="mobile"] .instruction,body[data-device="tablet"] .instruction{display:none}
+body[data-device="mobile"] .pickup-banner,body[data-device="tablet"] .pickup-banner{bottom:auto;top:calc(178px + var(--safe-top));min-width:0;width:min(420px,92vw)}
+@media(max-width:500px){
+ .hud{top:calc(8px + var(--safe-top));left:calc(8px + var(--safe-left));right:calc(112px + var(--safe-right));display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}
+ .metric{padding:5px 4px}
+ .metric label{font-size:7px;letter-spacing:.02em;white-space:nowrap}
+ .metric strong{font-size:clamp(13px,3.8vw,17px);margin-top:3px;white-space:nowrap}
+ .top-right{top:calc(8px + var(--safe-top));right:calc(8px + var(--safe-right));gap:4px}
+ .sound{width:44px;height:44px}
+}
 @media(max-height:480px){
  .mode-desc{display:none}
  .modes{margin-top:12px;gap:10px}
  .mode{width:200px}
- .hud{top:8px;left:10px}
- .objective{top:10px;left:auto;right:66px;transform:none;width:300px}
- .pickup-banner{top:92px;left:auto;right:66px;transform:none;width:300px}
+ .hud{top:calc(8px + var(--safe-top));left:calc(10px + var(--safe-left))}
+ .objective{top:calc(10px + var(--safe-top));left:auto;right:calc(66px + var(--safe-right));transform:none;width:300px}
+ .pickup-banner{top:calc(92px + var(--safe-top));left:auto;right:calc(66px + var(--safe-right));transform:none;width:300px}
  .pad{grid-template-columns:repeat(3,56px);grid-template-rows:56px 56px}
  .mobile-park{width:104px;height:80px}
  .mobile-honk{width:84px;height:44px;font-size:17px}
@@ -222,7 +247,7 @@ body[data-mode=rush] .mobile-honk{display:block}
 .title-links{margin-top:16px}
 @media(max-height:820px){#overlay.title .steps{display:none}#overlay.title .hero h1{font-size:clamp(56px,10vw,92px)}}
 @media(max-width:700px){#overlay.title .modes{flex-wrap:wrap}#overlay.title .mode{width:calc(50% - 8px)}}
-/* Shifts: level select, intro, stars, rain */
+/* Shifts: level select, intro, stars */
 .levels{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:16px;text-align:left}
 .lvl-card{display:flex;flex-direction:column;gap:5px;padding:12px 14px;cursor:pointer;text-align:left;color:var(--cream);background:var(--panel);border:2px solid var(--line);border-radius:18px;box-shadow:0 5px 0 #06101a;transition:transform .1s,border-color .1s}
 .lvl-card:hover:not([disabled]){border-color:var(--gold);transform:translateY(-2px)}
@@ -244,21 +269,17 @@ body[data-mode=rush] .mobile-honk{display:block}
 .goals{display:flex;justify-content:center;gap:14px;margin-top:6px;font:800 13px/1 'Nunito','Segoe UI',system-ui,sans-serif;color:var(--muted);flex-wrap:wrap}
 .goals .hit{color:var(--gold)}
 .intro-rule{margin:12px auto 0;max-width:480px;padding:10px 14px;border-radius:14px;background:#6cc8ff1f;font:700 15px/1.35 'Nunito','Segoe UI',system-ui,sans-serif}
-.rain{display:none;position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.5;background:repeating-linear-gradient(105deg,transparent 0 14px,#bfe3ff40 14px 15px,transparent 15px 34px);background-size:240px 240px;animation:rain .45s linear infinite}
-body[data-weather=rain] .rain{display:block}
-body.menu .rain{display:none}
-@keyframes rain{to{background-position:-60px 240px}}
 @media(max-width:700px){.levels{grid-template-columns:1fr}.stars{font-size:52px}}
 /* Shifts: minimal HUD */
 body[data-mode=rush] .shift-chip{display:none}
 body[data-mode=rush] .bottom{display:none}
-body[data-mode=rush] .objective{top:88px;width:auto;min-width:240px;max-width:min(420px,92vw);padding:8px 18px;border-radius:16px;box-shadow:0 4px 0 var(--gold-d);text-align:center}
+body[data-mode=rush] .objective{top:calc(88px + var(--safe-top));width:auto;min-width:240px;max-width:min(420px,92vw);padding:8px 18px;border-radius:16px;box-shadow:0 4px 0 var(--gold-d);text-align:center}
 body[data-mode=rush] .objective p{display:none}
 body[data-mode=rush] .call-label{font-size:11px}
 body[data-mode=rush] .call-main{margin-top:3px;font-size:22px}
-body[data-mode=rush] .jar{top:84px;left:24px;width:150px;height:16px;opacity:.85}
+body[data-mode=rush] .jar{top:calc(84px + var(--safe-top));left:calc(24px + var(--safe-left));width:150px;height:16px;opacity:.85}
 body[data-mode=rush] .jar span{font-size:9px;line-height:12px}
-body[data-mode=rush] .pickup-banner{bottom:24px;min-width:0;padding:6px 16px;border-radius:14px}
+body[data-mode=rush] .pickup-banner{bottom:calc(24px + var(--safe-bottom));min-width:0;padding:6px 16px;border-radius:14px}
 body[data-mode=rush] .pickup-banner .owner{font-size:17px}
 body[data-mode=rush] .pickup-banner .plate{margin-top:3px;font-size:11px}
 body[data-mode=rush] .toast{top:34%;font-size:16px;padding:8px 16px;border-width:1px;background:#0a1822cc}
@@ -268,8 +289,9 @@ body[data-mode=rush] .objective[data-info="1"] p{display:block}
 .title-links{gap:22px}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 /* Shift mode: on small / touch screens pin the guest banner to the top only (it was also pinned to the bottom and stretched over the whole lot) */
-@media(max-width:900px),(pointer:coarse){body[data-mode=rush] .pickup-banner{bottom:auto;top:154px;height:auto;min-width:0;width:min(300px,86vw);padding:6px 14px}}
-@media(max-height:480px){body[data-mode=rush] .pickup-banner{bottom:auto;top:92px;left:auto;right:66px;transform:none;width:300px}}
+@media(max-width:900px){body[data-mode=rush] .pickup-banner{bottom:auto;top:calc(154px + var(--safe-top));height:auto;min-width:0;width:min(300px,86vw);padding:6px 14px}}
+body[data-device="mobile"][data-mode="rush"] .pickup-banner,body[data-device="tablet"][data-mode="rush"] .pickup-banner{bottom:auto;top:calc(154px + var(--safe-top));height:auto;min-width:0;width:min(300px,86vw);padding:6px 14px}
+@media(max-height:480px){body[data-mode=rush] .pickup-banner{bottom:auto;top:calc(92px + var(--safe-top));left:auto;right:calc(66px + var(--safe-right));transform:none;width:300px}}
 /* Speech bubbles, highlights */
 .bubble{position:fixed;z-index:4;pointer-events:none;transform:translate(-50%,-100%);max-width:200px;padding:6px 11px;border-radius:12px;background:var(--cream);color:var(--ink);font:800 13px/1.25 'Nunito','Segoe UI',system-ui,sans-serif;text-align:center;box-shadow:0 3px 0 #0006;animation:bub 1.9s forwards}
 .bubble:after{content:'';position:absolute;left:50%;bottom:-6px;margin-left:-6px;border:6px solid transparent;border-bottom:0;border-top-color:var(--cream)}
@@ -279,46 +301,16 @@ body[data-mode=rush] .objective[data-info="1"] p{display:block}
 .highlights .medal{background:#ffc2472e;color:var(--gold)}
 /* hide the ugly scrollbar on cards (still scrolls by wheel / touch) */
 .hero{scrollbar-width:none;-ms-overflow-style:none}
+/* Prevent mobile long-press selection while leaving pinch zoom available. */
+body{-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;-webkit-touch-callout:none;overscroll-behavior:none}
 .hero::-webkit-scrollbar{display:none}
-/* Touch: no text selection, copy / paste bubbles, image callouts or double-tap zoom while playing */
-html,body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
-button,canvas,.overlay{-webkit-touch-callout:none;touch-action:manipulation}
-/* Mobile controls: steering wheel + gas / brake while driving, joystick while on foot */
-.mobile-controls{--u:1;inset:auto max(14px,env(safe-area-inset-right)) max(14px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left));touch-action:none}
-.mobile-controls,.mobile-controls *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:none}
-.ctl-left{position:relative;width:calc(168px*var(--u));height:calc(168px*var(--u));pointer-events:none}
-.joy,.wheel{position:absolute;inset:0;border-radius:50%;pointer-events:auto}
-.joy{display:none;background:radial-gradient(circle,#0a182299 0 55%,#0a182266 100%);border:2px solid #ffffff4d}
-.joy-knob{position:absolute;left:50%;top:50%;width:44%;height:44%;border-radius:50%;background:var(--gold);box-shadow:0 5px 0 var(--gold-d);transform:translate(-50%,-50%);pointer-events:none}
-body[data-ctl=foot] .joy{display:block}
-body[data-ctl=foot] .wheel{display:none}
-.wheel-rim{position:absolute;inset:5%;border-radius:50%;border:calc(15px*var(--u)) solid #0a1822e6;box-shadow:0 0 0 2px #ffffff55,inset 0 0 0 2px #ffffff30,0 6px 0 #06101a;pointer-events:none;will-change:transform}
-.wheel-rim:before{content:'';position:absolute;left:0;right:0;top:50%;height:calc(13px*var(--u));margin-top:calc(-6px*var(--u));background:#0a1822e6}
-.wheel-rim:after{content:'';position:absolute;left:50%;top:50%;bottom:0;width:calc(13px*var(--u));margin-left:calc(-6px*var(--u));background:#0a1822e6}
-.wheel-rim i{position:absolute;left:50%;top:calc(-15px*var(--u));width:calc(12px*var(--u));height:calc(15px*var(--u));margin-left:calc(-6px*var(--u));border-radius:4px;background:var(--gold);z-index:1}
-.wheel-rim b{position:absolute;left:50%;top:50%;width:30%;height:30%;transform:translate(-50%,-50%);border-radius:50%;background:#0a1822;border:3px solid var(--gold);z-index:1}
-.ctl-right{display:flex;flex-direction:column;align-items:flex-end;gap:10px;pointer-events:none}
-.ctl-top{display:flex;gap:10px;align-items:flex-end}
-.mobile-park{width:calc(112px*var(--u));height:calc(64px*var(--u));font-size:calc(24px*var(--u));border-radius:22px}
-body[data-ctl=foot] .mobile-park{width:calc(156px*var(--u));height:calc(120px*var(--u));font-size:calc(30px*var(--u));border-radius:32px}
-.mobile-honk{width:calc(80px*var(--u));height:calc(64px*var(--u));font-size:calc(18px*var(--u))}
-body[data-ctl=foot] .mobile-honk{display:none}
-.pedals{display:flex;gap:12px;align-items:flex-end;pointer-events:none}
-body[data-ctl=foot] .pedals{display:none}
-.pedal{pointer-events:auto;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:0;border:2px solid #ffffff55;border-radius:24px;font-family:'Fredoka','Trebuchet MS','Segoe UI',system-ui,sans-serif;font-weight:700;font-size:calc(19px*var(--u));-webkit-tap-highlight-color:transparent;transition:transform .06s,box-shadow .06s,filter .06s}
-.pedal small{font:800 calc(9px*var(--u))/1 'Nunito','Segoe UI',system-ui,sans-serif;letter-spacing:.1em;opacity:.85}
-.pedal.gas{width:calc(88px*var(--u));height:calc(128px*var(--u));background:linear-gradient(#6df0b4,#2fae7c);color:#062a1b;box-shadow:0 7px 0 #1f9467}
-.pedal.brake{width:calc(72px*var(--u));height:calc(92px*var(--u));background:linear-gradient(#ff8a7e,#d6483b);color:#fff;box-shadow:0 7px 0 #a83a31}
-.pedal.down{transform:translateY(5px);box-shadow:0 2px 0 #0008;filter:brightness(1.15)}
-@media(max-height:480px){.mobile-controls{--u:.78}}
-@media(max-width:400px) and (orientation:portrait){.mobile-controls{--u:.88}}
 </style>
 <script type="importmap">{"imports":{"three":"./assets/three/three.module.js"}}</script>
 </head><body class="menu">
-<canvas id="game"></canvas><div class="rain" aria-hidden="true"></div><div class="vignette"></div><div class="grain"></div>
+<canvas id="game"></canvas><div id="adBlock" aria-live="polite"><span>Loading ad…</span></div><div class="vignette"></div><div class="grain"></div>
 
 <section class="hud" aria-label="Shift status">
-<div class="metric"><label>TIME</label><strong id="time">01:20</strong></div>
+<div class="metric"><label id="timeLabel">TIME</label><strong id="time">01:20</strong></div>
 <div class="metric"><label>TIPS</label><strong class="gold" id="score">$000</strong></div>
 <div class="metric"><label>STREAK</label><strong id="streak">×0</strong></div>
 <div class="metric"><label>STRIKES</label><strong id="lives">♥♥♥</strong></div>
@@ -330,18 +322,9 @@ body[data-ctl=foot] .pedals{display:none}
 <div class="pickup-banner" id="pickup"><div class="owner" id="ownerText">A guest is waiting</div><div class="plate" id="plateText">PLEASE RETURN THEIR CAR</div></div>
 
 <footer class="bottom"><div class="instruction"><span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span><span class="instruction-text">Drive</span><span class="key space">SPACE</span><span class="instruction-text">Park</span><span class="key">CLICK</span><span class="instruction-text">Return keys</span></div></footer>
-<div class="mobile-controls">
-<div class="ctl-left">
-<div class="joy" id="joy" aria-label="Move"><div class="joy-knob" id="joyKnob"></div></div>
-<div class="wheel" id="wheel" aria-label="Steering wheel"><div class="wheel-rim" id="wheelRim"><i></i><b></b></div></div>
-</div>
-<div class="ctl-right">
-<div class="ctl-top"><button class="mobile-honk" id="honkBtn" aria-label="Honk">HONK</button><button class="mobile-park" id="parkBtn">PARK</button></div>
-<div class="pedals"><button class="pedal brake" id="brakeBtn" aria-label="Brake and reverse">BRAKE<small>REVERSE</small></button><button class="pedal gas" id="gasBtn" aria-label="Gas">GAS</button></div>
-</div>
-</div>
+<div class="mobile-controls"><div class="pad"><button data-key="ArrowUp" aria-label="Forward">↑</button><button data-key="ArrowLeft" aria-label="Steer left">←</button><button data-key="ArrowDown" aria-label="Reverse">↓</button><button data-key="ArrowRight" aria-label="Steer right">→</button></div><div class="pad-right"><button class="mobile-honk" id="honkBtn" aria-label="Honk">HONK</button><button class="mobile-park" id="parkBtn">PARK</button></div></div>
 <div class="toast" id="toast" role="status"></div>
 
-<div class="overlay title" id="overlay"><div class="hero"><div class="hero-eyebrow">Nocturne Hotel · Valet Club</div><h1>Valet<br><em>Panic!</em></h1><p>Park the guests' cars, hand them back, and out-valet the rival.</p><div class="best-line" id="bestLine"></div><div class="profile" id="profileLine"></div><div class="modes"><div class="mode"><button class="play rush" id="startRush">Loading…</button><span class="mode-desc">DUEL · START HERE · BEAT THE RIVAL VALET, SHIFT BY SHIFT</span></div><div class="mode"><button class="play" id="start">Loading…</button><span class="mode-desc">MEMORY · park it, remember it, return the right car</span></div></div><div class="title-links"><button class="link" id="tutorialBtn">▶ How to play</button><button class="link" id="levelsBtn">📋 All shifts</button><button class="link" id="locker">🎒 Locker</button><button class="link" id="logBtn">📊 Copy playtest log</button></div><div class="hero-foot">WASD / arrows to move · run up to a car to hop in · Space to park</div></div></div>
+<div class="overlay title" id="overlay"><div class="hero"><div class="hero-eyebrow">Nocturne Hotel · Valet Club</div><h1>Valet<br><em>Panic!</em></h1><p>Park the guests' cars, hand them back, and out-valet the rival.</p><div class="best-line" id="bestLine"></div><div class="profile" id="profileLine"></div><div class="modes"><div class="mode"><button class="play rush" id="startRush" disabled>Loading…</button><span class="mode-desc">DUEL · START HERE · BEAT THE RIVAL VALET, SHIFT BY SHIFT</span></div><div class="mode"><button class="play" id="start" disabled>Loading…</button><span class="mode-desc">MEMORY · park it, remember it, return the right car</span></div></div><div class="title-links"><button class="link" id="tutorialBtn" disabled>▶ How to play</button><button class="link" id="levelsBtn" disabled>📋 All shifts</button><button class="link" id="locker" disabled>🎒 Locker</button><button class="link" id="sceneLabBtn" disabled hidden>🧪 Scene lab</button><button class="link" id="logBtn" disabled hidden>📊 Copy playtest log</button></div><div class="hero-foot">WASD / arrows to move · run up to a car to hop in · Space to park</div></div></div>
 <script type="module" src="./game.js"></script>
 </body></html>

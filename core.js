@@ -3,9 +3,11 @@
 import * as THREE from 'three';
 import { GLTFLoader } from './assets/three/GLTFLoader.js';
 import { createAudio } from './audio.js';
-import { CAR_COLORS, CONFETTI, PAINT_LEVEL, reduceMotion } from './config.js';
-import { dateKey, equippedItem, mulberry32, playerLevel, seedFromKey } from './progress.js';
+import { CAR_COLORS, CONFETTI, PAINT_LEVEL, PARK_ANGLE, reduceMotion } from './config.js';
+import { equippedItem, playerLevel } from './progress.js';
 import { G, perks, rush, slots } from './state.js';
+
+export { PARK_ANGLE };
 
 export const canvas = document.querySelector('#game');
 
@@ -15,7 +17,7 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 1.6));
 
 renderer.shadowMap.enabled = true;
 
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = THREE.PCFShadowMap;
 
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 
@@ -35,7 +37,8 @@ camera.position.set(0, 25, 19);
 
 camera.lookAt(0, 0, -1.7);
 
-export const clock = new THREE.Clock();
+export const clock = new THREE.Timer();
+clock.connect(document);
 
 export const loader = new GLTFLoader();
 
@@ -77,16 +80,13 @@ export const parkRadius = () => 1.9 + 0.25 * perks.ring + (G.mode === 'rush' ? (
 export const parkSpeed = () => 2.2 + 0.4 * perks.ring + (G.mode === 'rush' ? (0.6 + 0.3 * rush.perks.ring + 2.2 * (rush.lv.speedScale - 1)) : 0);
 
 // Which way a parked car faces: nose-in (towards the hotel) or, on Reverse shifts, nose-out.
-export const parkYaw = () => (G.mode === 'rush' && rush.lv.park === 'reverse' ? 0 : Math.PI);
+export const parkYaw = (target = null) => target && Number.isFinite(target.yaw)
+  ? target.yaw
+  : (G.mode === 'rush' && rush.lv.park === 'reverse' ? 0 : Math.PI);
 
-// A car may park facing either way (nose-in or nose-out): this returns whichever of the two is nearer to the given heading.
-export const bayYaw = (yaw) => { const Y = parkYaw(); return Math.cos(yaw - Y) >= 0 ? Y : Y + Math.PI; };
-
-export const gripOf = () => (G.mode === 'rush' ? rush.lv.grip * (rush.shower > 0 ? 0.6 : 1) : 1);
+export const gripOf = () => (G.mode === 'rush' ? rush.lv.grip : 1);
 
 export const openSlots = () => slots.filter((s) => !s.closed);
-
-export const PARK_ANGLE = 1.0;
 
 export const tipMul = () => 1 + 0.2 * perks.tips;
 
@@ -99,23 +99,16 @@ export const pickupPatience = () => Math.max(10, 20 - (G.shift - 1) * 0.75 - G.s
 // Quirks, VIPs and ID digits scale with the shift (Classic) or the level (Rush Hour).
 export const difficulty = () => (G.mode === 'rush' ? rush.level : G.shift);
 
-// Only paints the player has unlocked appear on the lot (the Daily Run uses the base eight for fairness).
+// Only paints the player has unlocked appear on the lot.
 export const paintPool = () => {
-  const lv = G.mode === 'rush' && rush.daily ? 1 : playerLevel();
+  const lv = playerLevel();
   return CAR_COLORS.map((_, i) => i).filter((i) => PAINT_LEVEL[i] <= lv);
 };
 
-export function setSeeds(daily) {
-  if (daily) {
-    const seed = seedFromKey(dateKey());
-    G.rngCars = mulberry32(seed);
-    G.rngTok = mulberry32(seed ^ 0x9e3779b9);
-    G.rngMisc = mulberry32(seed ^ 0x85ebca6b);
-  } else G.rngCars = G.rngTok = G.rngMisc = Math.random;
-}
+const _wp = new THREE.Vector3();
 
 export function worldToScreen(x, z, y = 0.5) {
-  const p = new THREE.Vector3(x, y, z).project(camera);
+  const p = _wp.set(x, y, z).project(camera);
   return { x: (p.x + 1) / 2 * innerWidth, y: (1 - p.y) / 2 * innerHeight };
 }
 

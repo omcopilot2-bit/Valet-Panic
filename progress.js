@@ -1,6 +1,7 @@
-// Save data, XP / player level, unlock rules, the daily seed and the local leaderboards.
+// Save data, XP / player level, unlock rules, the local leaderboards.
 // Everything lives in one localStorage record so it can be exported or reset in one place.
-import { PAINTS, OUTFITS, BAY_THEMES, CONFETTI, HATS, HORNS, LEVELS, DAILY_LEVEL_IDS } from './config.js';
+import { PAINTS, OUTFITS, BAY_THEMES, CONFETTI, HATS, HORNS, LEVELS } from './config.js';
+import * as platform from './platform.js';
 
 const KEY = 'valetSave2';
 export const MAX_PLAYER_LEVEL = 30;
@@ -11,13 +12,10 @@ const DEFAULTS = () => ({
   bestRush: 0,        // best Rush run
   tut: { classic: false, rush: false },
   equipped: { outfit: 'burgundy', bay: 'classic', confetti: 'party', hat: 'cap', horn: 'classic' },
-  topRush: [],        // [{ score, date }] best five Rush runs (legacy)
+  topRush: [],        // legacy field, kept so old saves still merge
   levels: {},         // { [levelId]: { stars, best } } campaign progress
-  daily: { date: '', attempts: 0, best: 0 },
-  dailyBoard: [],     // [{ date, score }] best ten daily scores of all time
-  streak: { count: 0, last: '' },
   stats: { runs: 0, parked: 0, delivered: 0, bestMult: 1 },
-  runLog: [],         // last 60 finished Shifts / Daily runs, for tuning the star goals from real play
+  runLog: [],         // last 60 finished Shifts, for tuning the star goals from real play
 });
 
 function safeGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
@@ -35,9 +33,19 @@ function merge(target, src) {
   }
 }
 
+function parseSave(raw) {
+  if (!raw) return null;
+  try {
+    const data = JSON.parse(raw);
+    return data && typeof data === 'object' && !Array.isArray(data) ? data : null;
+  } catch (e) {
+    console.error('Ignoring invalid saved progress data', e);
+    return null;
+  }
+}
+
 export function load() {
-  let data = null;
-  try { data = JSON.parse(safeGet(KEY) || 'null'); } catch (e) { data = null; }
+  const data = parseSave(safeGet(KEY));
   if (data) merge(save, data);
   else {
     // First launch of this version: carry over the old single-value keys.
@@ -49,7 +57,40 @@ export function load() {
   return save;
 }
 
-export function persist() { safeSet(KEY, JSON.stringify(save)); }
+// Every save goes to this browser and, on CrazyGames, to the player's account (Data module) so progress follows them across devices.
+export function persist() {
+  const raw = JSON.stringify(save);
+  if (platform.isReady()) {
+    if (!platform.dataSet(KEY, raw)) safeSet(KEY, raw);
+    return;
+  }
+  safeSet(KEY, raw);
+}
+
+// CrazyGames Data is account-scoped and authoritative. Import a legacy browser save only
+// for guests with no Data Module save; logged-in accounts must never inherit another
+// player's localStorage record on a shared device.
+export function loadFromPlatform(raw = platform.dataGet(KEY), allowLegacyGuestMigration = false) {
+  Object.assign(save, DEFAULTS());
+  const remote = parseSave(raw);
+  if (remote) {
+    merge(save, remote);
+    return { hasPlatformSave: true, migratedLegacySave: false };
+  }
+
+  if (allowLegacyGuestMigration) {
+    const hasLegacySave = safeGet(KEY) !== null || safeGet('valetBest') !== null
+      || safeGet('valetBestRush') !== null || safeGet('valetTut') !== null || safeGet('valetTutRush') !== null;
+    if (hasLegacySave) {
+      load();
+      const saved = platform.dataSet(KEY, JSON.stringify(save));
+      if (!saved) safeSet(KEY, JSON.stringify(save));
+      return { hasPlatformSave: false, migratedLegacySave: true };
+    }
+  }
+
+  return { hasPlatformSave: false, migratedLegacySave: false };
+}
 
 /* ---------- XP and levels ---------- */
 // XP needed to go from level n to n + 1.
@@ -88,80 +129,6 @@ export function equip(kind, id) { save.equipped[kind] = id; persist(); }
 export function equippedItem(kind, list) {
   const found = list.find((i) => i.id === save.equipped[kind] && isUnlocked(i));
   return found || list[0];
-}
-
-/* ---------- daily run ---------- */
-export function dateKey(d = new Date()) {
-  const p = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-}
-export function seedFromKey(key) {
-  let h = 2166136261;
-  for (let i = 0; i < key.length; i++) { h ^= key.charCodeAt(i); h = Math.imul(h, 16777619); }
-  return h >>> 0;
-}
-// Small, fast seeded generator, so every player gets the same cars on the same day.
-export function mulberry32(seed) {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6D2B79F5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-export function dailyToday() {
-  const today = dateKey();
-  if (save.daily.date !== today) save.daily = { date: today, attempts: 0, best: 0 };
-  return save.daily;
-}
-
-function dayBefore(key) {
-  const [y, m, d] = key.split('-').map(Number);
-  return dateKey(new Date(y, m - 1, d - 1));
-}
-
-// Records a finished daily run. Returns the rank on the all-time board and the streak bonus XP.
-export function recordDaily(score) {
-  const d = dailyToday();
-  d.attempts++;
-  const isBest = score > d.best;
-  if (isBest) d.best = score;
-
-  const today = d.date;
-  let bonusXp = 0;
-  if (save.streak.last !== today) {
-    save.streak.count = save.streak.last === dayBefore(today) ? save.streak.count + 1 : 1;
-    save.streak.last = today;
-    bonusXp = Math.min(100, 20 * save.streak.count);   // first run of the day pays a streak bonus
-  }
-
-  const entry = { date: today, score };
-  if (score > 0) {                                   // a $0 run never earns a board place
-    save.dailyBoard.push(entry);
-    save.dailyBoard.sort((a, b) => b.score - a.score);
-    save.dailyBoard = save.dailyBoard.slice(0, 10);
-  }
-  const rank = save.dailyBoard.indexOf(entry) + 1;   // 0 when it did not make the board
-  persist();
-  return { rank, isBest, bonusXp, streak: save.streak.count, attempts: d.attempts, todayBest: d.best };
-}
-
-export function recordRush(score, stats) {
-  const prevBest = save.bestRush;
-  const record = score > prevBest;
-  if (record) save.bestRush = score;
-  save.topRush.push({ score, date: dateKey() });
-  save.topRush.sort((a, b) => b.score - a.score);
-  save.topRush = save.topRush.slice(0, 5);
-  save.stats.runs++;
-  save.stats.parked += stats.parked || 0;
-  save.stats.delivered += stats.delivered || 0;
-  save.stats.bestMult = Math.max(save.stats.bestMult, stats.maxMult || 1);
-  persist();
-  return { prevBest, record };
 }
 
 // Appends one finished run to the playtest log (newest last, capped).
@@ -210,10 +177,4 @@ export function recordLevel(lv, score, stars = starsFor(lv, score)) {
   if (info.firstClear && next) info.unlockedNext = next;
   persist();
   return info;
-}
-
-// Which shift today's Daily Run plays (same for everyone on a given date).
-export function dailyLevel(key = dateKey()) {
-  const id = DAILY_LEVEL_IDS[seedFromKey(key) % DAILY_LEVEL_IDS.length];
-  return LEVELS.find((l) => l.id === id);
 }

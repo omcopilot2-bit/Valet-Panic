@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800">
+  <defs>
+    <linearGradient id="sky" x2="0" y2="1">
+      <stop stop-color="#08131e"/>
+      <stop offset="1" stop-color="#163749"/>
+    </linearGradient>
+    <linearGradient id="road" x2="0" y2="1">
+      <stop stop-color="#30434d"/>
+      <stop offset="1" stop-color="#101e29"/>
+    </linearGradient>
+    <linearGradient id="paint" x2="0" y2="1">
+      <stop stop-color="#ff8573"/>
+      <stop offset=".48" stop-color="#cf3e50"/>
+      <stop offset="1" stop-color="#7d263c"/>
+    </linearGradient>
+    <linearGradient id="glass" x2="0" y2="1">
+      <stop stop-color="#91d9e3"/>
+      <stop offset="1" stop-color="#315769"/>
+    </linearGradient>
+    <radialGradient id="halo">
+      <stop stop-color="#f8cb74" stop-opacity=".28"/>
+      <stop offset="1" stop-color="#f8cb74" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="windows" width="125" height="92" patternUnits="userSpaceOnUse">
+      <rect x="22" y="19" width="52" height="37" rx="4" fill="#e2b875" opacity=".8"/>
+      <rect x="28" y="25" width="40" height="25" fill="#ffe5ae" opacity=".74"/>
+      <path d="M48 25v25M28 37h40" stroke="#ad8054" stroke-width="4" opacity=".7"/>
+    </pattern>
+    <filter id="shadow" x="-.2" y="-.3" width="1.5" height="1.7">
+      <feGaussianBlur stdDeviation="13"/>
+    </filter>
+  </defs>
+  <rect width="800" height="800" fill="url(#sky)"/>
+  <circle cx="640" cy="170" r="220" fill="url(#halo)"/>
+  <circle cx="663" cy="153" r="48" fill="#f3d9a1" opacity=".92"/>
+  <path d="M0 440 124 360l105 40 122-96 109 76 100-57 240 86v160H0Z" fill="#112735"/>
+  <path d="M0 473V206h281v267Zm266 0V151h334v322Zm320 0V240h214v233Z" fill="#172f3d"/>
+  <path d="M0 206h281v267H0Zm266-55h334v322H266Zm320 89h214v233H586Z" fill="url(#windows)" opacity=".74"/>
+  <path d="M0 206h281v20H0Zm266-55h334v22H266Zm320 89h214v20H586Z" fill="#d1a96e"/>
+  <text x="400" y="113" fill="#ffe0a2" font-family="Arial, sans-serif" font-size="15" font-weight="700" letter-spacing="3.5" text-anchor="middle">NOCTURNE HOTEL</text>
+  <path d="M0 560h800v240H0Z" fill="url(#road)"/>
+  <path d="M0 559h800" stroke="#edca85" stroke-width="5" opacity=".85"/>
+  <path d="m88 800 172-241m242 241 68-241M0 710h150m515 0h135" stroke="#f3d69b" stroke-width="6" opacity=".42"/>
+  <ellipse cx="395" cy="619" rx="320" ry="43" fill="#050b10" opacity=".67" filter="url(#shadow)"/>
+  <g transform="translate(82 410) scale(.9)">
+    <path d="M76 250 129 163q19-35 65-42l169-26q51-8 92 20l121 88 104 28q37 10 51 49l18 57H53l8-51q4-23 15-36Z" fill="url(#paint)" stroke="#ffb28d" stroke-width="8"/>
+    <path d="m210 151 155-23q37-6 68 14l89 67H169Z" fill="url(#glass)" stroke="#f2ba91" stroke-width="7"/>
+    <path d="m366 130 65 11q12 2 23 10l75 58H372Z" fill="#c6f2ec" opacity=".38"/>
+    <path d="M162 210h390m-377 25h75m283 0h54" stroke="#ffc3a0" stroke-width="6" opacity=".7"/>
+    <path d="m66 267 74-8 17 26-95 15Zm616 4-89-17-20 27 117 17Z" fill="#fff1bf"/>
+    <path d="M91 288h88m395 0h93" stroke="#ffe0a4" stroke-width="5"/>
+    <circle cx="199" cy="329" r="71" fill="#0b141a" stroke="#465b62" stroke-width="14"/>
+    <circle cx="199" cy="329" r="35" fill="#d5d5c9" stroke="#738187" stroke-width="9"/>
+    <circle cx="199" cy="329" r="10" fill="#283a43"/>
+    <circle cx="551" cy="329" r="71" fill="#0b141a" stroke="#465b62" stroke-width="14"/>
+    <circle cx="551" cy="329" r="35" fill="#d5d5c9" stroke="#738187" stroke-width="9"/>
+    <circle cx="551" cy="329" r="10" fill="#283a43"/>
+    <path d="M54 301h650" stroke="#f5a078" stroke-width="7" opacity=".8"/>
+  </g>
+  <g transform="translate(615 463) scale(.66)">
+    <path d="M49 172q7-57 60-57t61 57l23 139H25Z" fill="#73344b" stroke="#e5b678" stroke-width="6"/>
+    <path d="M52 208h113l17 96H36Z" fill="#4a263d"/>
+    <path d="M43 213 6 285q-10 23 12 35 19 9 32-13l41-72m75-22 40 71q13 23-8 36-19 10-33-13l-39-69" fill="none" stroke="#e6b781" stroke-width="24" stroke-linecap="round"/>
+    <path d="M69 304 49 367m77-63 25 63" stroke="#e6b781" stroke-width="23" stroke-linecap="round"/>
+    <path d="M31 366h39m68 0h39" stroke="#18242c" stroke-width="24" stroke-linecap="round"/>
+    <circle cx="109" cy="72" r="57" fill="#d99c73"/>
+    <path d="M55 64q10-70 68-63 41 5 53 60l-20-15-71-5Z" fill="#292638"/>
+    <path d="M38 81q-4-46 19-64l14 36Z" fill="#292638"/>
+    <path d="M96 82h7m30 0h7" stroke="#392c34" stroke-width="7" stroke-linecap="round"/>
+    <path d="M103 106q12 10 24 0" fill="none" stroke="#7d3e48" stroke-width="5" stroke-linecap="round"/>
+    <path d="M74 120h72v22H74Z" fill="#f0c46e"/>
+    <path d="M109 122v28m-13-17h26" stroke="#553247" stroke-width="5"/>
+  </g>
+  <text x="400" y="291" fill="#08131e" stroke="#08131e" stroke-width="19" stroke-linejoin="round" font-family="Arial, sans-serif" font-size="100" font-weight="900" letter-spacing="1" text-anchor="middle">VALET</text>
+  <text x="400" y="291" fill="#fff4dd" font-family="Arial, sans-serif" font-size="100" font-weight="900" letter-spacing="1" text-anchor="middle">VALET</text>
+  <text x="400" y="405" fill="#101620" stroke="#101620" stroke-width="20" stroke-linejoin="round" font-family="Arial, sans-serif" font-size="112" font-weight="900" letter-spacing="-1" text-anchor="middle">PANIC!</text>
+  <text x="400" y="405" fill="#f5c56b" font-family="Arial, sans-serif" font-size="112" font-weight="900" letter-spacing="-1" text-anchor="middle">PANIC!</text>
+  <path d="M190 431h420" stroke="#e7a655" stroke-width="8" stroke-linecap="round"/>
+</svg>

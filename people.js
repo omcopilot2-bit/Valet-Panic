@@ -1,10 +1,11 @@
 // People (valet, guests, rival, doorman, dog), the drop-off / pick-up rings and the guide arrow.
 import * as THREE from 'three';
+import { CAR_BODY_OFFSETS, CAR_BODY_RADIUS, circleVsCollider, circleVsParkingBox, separationNormal } from './collision.js';
 import { SHADOW_GEO, SHADOW_MAT } from './cars.js';
-import { ARRIVAL_PATH, DROPOFF, HANDOFF, HATS, OUTFITS, SPAWN } from './config.js';
+import { arrivalPath, BOUNDS, BUILDING_MIN_Z, DROPOFF, HANDOFF, HATS, OUTFITS, PARKED_HALF, SPAWN, WALK_Z } from './config.js';
 import { scene } from './core.js';
 import { equippedItem } from './progress.js';
-import { rush } from './state.js';
+import { cars, G, rush, slots } from './state.js';
 import { addTextTexture } from './world.js';
 
 const SKIN_TONES = [0xf1c8a0, 0xd9a273, 0xb07a52, 0x8a5a3c, 0x5d3a26];
@@ -189,6 +190,8 @@ export function spawnFigure(role, x, z, yaw = 0) {
   Object.assign(f, {
     anim: 'idle', moveAnim: 'walk', after: 'idle', t: Math.random() * 6, yaw,
     path: null, speed: 0, onDone: null, delay: 0, life: null, poof: null, popIn: 0,
+    px: x, pz: z, vs: 0, gait: 0, amp: 0, leanS: 0, blockT: 0, noCollide: false, buildingRoute: false,   // measured speed + gait phase, obstacle bookkeeping
+    r: role === 'dog' ? 0.22 : 0.3,
   });
   f.root.position.set(x, 0.02, z);
   f.root.rotation.y = yaw;
@@ -202,6 +205,7 @@ function setAnim(f, anim) { f.anim = anim; }
 
 export function walkTo(f, path, speed, onDone, anim = 'walk') {
   f.path = path.map((p) => [p[0], p[1]]);
+  f.buildingRoute = (f.role === 'guest' || f.role === 'dog') && (onDone === enterBuilding || path.some((point) => point[1] < BOUNDS.minZ));
   f.speed = speed;
   f.onDone = onDone || null;
   f.moveAnim = anim;
@@ -222,27 +226,143 @@ export function clearFigures() {
   valetFig = null;
 }
 
-function posePerson(f) {
-  let sw = 0, amp = 0, lean = 0, bob = 0;
-  if (f.anim === 'walk') { sw = Math.sin(f.t * 9); amp = 0.7; bob = Math.abs(sw) * 0.025; }
-  else if (f.anim === 'run') { sw = Math.sin(f.t * 15); amp = 1.1; lean = 0.28; bob = Math.abs(sw) * 0.05; }
-  else bob = Math.sin(f.t * 2.2) * 0.006;
+// Limbs follow the real ground speed: the stride phase advances with the distance covered (no foot sliding),
+// the swing eases in and out instead of snapping between idle / walk / run.
+function posePerson(f, dt) {
+  const v = f.vs;
+  const target = Math.min(1.15, v * 0.22) * (v > 0.12 ? 1 : 0);
+  f.amp += (target - f.amp) * Math.min(1, dt * 12);
+  f.gait += v * dt * 2.9;
+  const lean = Math.max(0, Math.min(1, (v - 3.5) / 1.5)) * 0.28;
+  f.leanS += (lean - f.leanS) * Math.min(1, dt * 8);
+  const sw = Math.sin(f.gait);
+  const amp = f.amp;
+  const bob = f.amp > 0.05 ? Math.abs(sw) * 0.03 * Math.min(1, amp / 0.7) : Math.sin(f.t * 2.2) * 0.006;
   f.legL.rotation.x = sw * amp;
   f.legR.rotation.x = -sw * amp;
   f.armL.rotation.x = -sw * amp * 0.9;
   f.armR.rotation.x = sw * amp * 0.9;
   f.armL.rotation.z = -0.06;
   f.armR.rotation.z = 0.06;
-  if (f.anim === 'wave') {
+  if (f.anim === 'wave' && amp < 0.2) {
     f.armR.rotation.x = 0;
     f.armR.rotation.z = 2.5 + Math.sin(f.t * 11) * 0.28;
   }
-  if (f.bag && f.anim !== 'run') f.armL.rotation.x = -sw * amp * 0.3;     // a heavy bag swings less
-  f.upper.rotation.x = lean;
+  if (f.bag && v < 4) f.armL.rotation.x = -sw * amp * 0.3;     // a heavy bag swings less
+  f.upper.rotation.x = f.leanS;
   f.upper.position.y = bob;
 }
 
+// Pushes a point (a walker) out of everything solid: props, closed bays, parked and moving cars.
+// Returns true when it had to move. `skip` is a car to ignore (the one being boarded).
+export function pushFromObstacles(p, r, skip = null) {
+  let moved = false;
+  const out = (dx, dz, d, min, seed = 'obstacle') => {
+    const [nx, nz] = separationNormal(dx, dz, seed);
+    p.x += nx * (min - d); p.z += nz * (min - d); moved = true;
+  };
+  for (const c of G.colliders) {
+    if (c.disabled) continue;
+    const hit = circleVsCollider(p.x, p.z, r, c, c.kind || 'prop');
+    if (hit) { p.x += hit.nx * hit.depth; p.z += hit.nz * hit.depth; moved = true; }
+  }
+  for (const s of slots) {
+    if (!s.closed && !(s.car && s.car !== skip)) continue;
+    const hit = circleVsParkingBox(p.x, p.z, r, s, PARKED_HALF.x, PARKED_HALF.z);
+    if (hit) { p.x += hit.nx * hit.depth; p.z += hit.nz * hit.depth; moved = true; }
+  }
+  for (const c of cars) {
+    if (c === skip) continue;
+    const fx = Math.sin(c.yaw), fz = Math.cos(c.yaw);
+      for (const off of CAR_BODY_OFFSETS) {
+        const dx = p.x - (c.x + fx * off), dz = p.z - (c.z + fz * off), d = Math.hypot(dx, dz), min = r + CAR_BODY_RADIUS;
+        if (d < min) out(dx, dz, d, min, `${c.id}:${p.role || 'walker'}`);
+    }
+  }
+  return moved;
+}
+
+// Live positions of the people the valet and the rival must not walk through.
+export function otherPeople(except) {
+  const list = [];
+  for (const f of figures) {
+    if (f === except || f.poof !== null || f.popIn < 0.1) continue;
+    if (f.role === 'valet' || f.role === 'rival' || f.role === 'guest' || f.role === 'doorman' || f.role === 'dog') {
+      list.push({ x: f.root.position.x, z: f.root.position.z, r: f.r, fig: f });
+    }
+  }
+  return list;
+}
+
+// Two walkers never overlap: the one that is not in charge of its own movement gives way.
+export function pushFromPeople(p, r, except, passThroughCrowd = false) {
+  let moved = false;
+  for (const o of otherPeople(except)) {
+    // Walking guests / dogs on a building route may overlap each other: the door is one body wide, and two guests pushing each
+    // other head-on (one going in, one coming out) used to deadlock the whole queue.
+    if (passThroughCrowd && (o.fig?.role === 'guest' || o.fig?.role === 'dog')) continue;
+    const dx = p.x - o.x, dz = p.z - o.z, d = Math.hypot(dx, dz), min = r + o.r;
+    if (d < min) {
+      const [nx, nz] = separationNormal(dx, dz, `${except?.role || p.role || 'walker'}:${o.fig?.role || 'person'}`);
+      p.x += nx * (min - d); p.z += nz * (min - d); moved = true;
+    }
+  }
+  return moved;
+}
+
+function clearWalkerStep(f, x, z) {
+  // The hotel doors sit behind the lot's driving boundary. Let guest routes cross that threshold;
+  // keeping the lot bound here strands every arriving/departing guest just outside the building.
+  const minZ = f.buildingRoute ? BUILDING_MIN_Z : BOUNDS.minZ;
+  if (x < BOUNDS.minX + f.r || x > BOUNDS.maxX - f.r || z < minZ || z > BOUNDS.maxZ - f.r) return false;
+  if (f.noCollide) return true;
+  // Guests heading for the lobby: once they reach the sidewalk strip behind the bays (and the door steps) nothing on the lot blocks them.
+  // Angled and staggered bays used to reach into this strip and trap them just short of the door.
+  if (!(f.buildingRoute && z < WALK_Z + 0.55)) {
+    const probe = { x, z };
+    pushFromObstacles(probe, f.r);
+    if (Math.hypot(probe.x - x, probe.z - z) > 0.025) return false;
+  }
+  for (const o of otherPeople(f)) {
+    if (o.fig?.role !== 'valet' && o.fig?.role !== 'rival') continue;
+    if (Math.hypot(x - o.x, z - o.z) < f.r + o.r + 0.04) return false;
+  }
+  return true;
+}
+
+// A walker goes in through the lobby door: removed once it is behind the facade (never shrunk or faded in plain view).
+export const enterBuilding = (f) => removeFigure(f);
+
 export function updateFigures(dt) {
+  // Crowd separation is applied before and after individual walker steps. This keeps guests,
+  // the rival valet and the player valet from becoming a permanent stack in the curb/door lane.
+  for (let pass = 0; pass < 2; pass++) {
+    const active = [...figures].filter((f) =>
+      f.poof === null && f.popIn >= 0.1);
+    for (let i = 0; i < active.length; i++) {
+      const a = active[i];
+      for (let j = i + 1; j < active.length; j++) {
+        const b = active[j];
+        if (a.buildingRoute && b.buildingRoute
+          && (a.role === 'guest' || a.role === 'doorman')
+          && (b.role === 'guest' || b.role === 'doorman')) continue;
+        const ap = a.root.position, bp = b.root.position;
+        const dx = ap.x - bp.x, dz = ap.z - bp.z;
+        const d = Math.hypot(dx, dz);
+        const min = a.r + b.r + 0.14;
+        if (d >= min) continue;
+        const angle = d > 0.001 ? Math.atan2(dz, dx)
+          : (i * 1.618 + j * 0.913) % (Math.PI * 2);
+        const nx = Math.cos(angle), nz = Math.sin(angle);
+        const overlap = min - d;
+        const aPriority = a.role === 'guest' ? 0.58 : 0.5;
+        ap.x += nx * overlap * aPriority;
+        ap.z += nz * overlap * aPriority;
+        bp.x -= nx * overlap * (1 - aPriority);
+        bp.z -= nz * overlap * (1 - aPriority);
+      }
+    }
+  }
   for (const f of [...figures]) {
     f.t += dt;
     if (f.delay > 0) {
@@ -251,27 +371,63 @@ export function updateFigures(dt) {
     } else if (f.path) {
       const p = f.path[0];
       const dx = p[0] - f.root.position.x, dz = p[1] - f.root.position.z, d = Math.hypot(dx, dz);
-      const step = f.speed * dt;
-      if (d <= step) {
-        f.root.position.x = p[0];
-        f.root.position.z = p[1];
-        f.path.shift();
-        if (!f.path.length) {
-          f.path = null;
-          f.anim = f.after;
-          const cb = f.onDone;
-          f.onDone = null;
-          if (cb) cb(f);
+      if (d <= 1e-4) f.path.shift();
+      else {
+        const step = Math.min(f.speed * dt, d);
+        const fx = dx / d, fz = dz / d;
+        const sx = -fz, sz = fx;
+        const choices = [
+          [f.root.position.x + fx * step, f.root.position.z + fz * step, d <= f.speed * dt],
+          [f.root.position.x + (fx * 0.45 + sx * 0.9) * step, f.root.position.z + (fz * 0.45 + sz * 0.9) * step, false],
+          [f.root.position.x + (fx * 0.45 - sx * 0.9) * step, f.root.position.z + (fz * 0.45 - sz * 0.9) * step, false],
+        ];
+        let best = null, bestD = Infinity;
+        for (const [x, z, reachesWaypoint] of choices) {
+          if (!clearWalkerStep(f, x, z)) continue;
+          const nd = Math.hypot(p[0] - x, p[1] - z);
+          if (nd < bestD) { best = [x, z, reachesWaypoint]; bestD = nd; }
         }
-      } else {
-        f.root.position.x += dx / d * step;
-        f.root.position.z += dz / d * step;
-        f.yaw = Math.atan2(dx, dz);
+        // Boxed in for more than a moment (a valet, a car or a prop in the way): walk straight on instead of freezing forever.
+        if (!best) {
+          f.stuckT = (f.stuckT || 0) + dt;
+          if (f.stuckT > 0.6 && f.role !== 'valet') {
+            const [gx, gz] = choices[0];
+            if (gx >= BOUNDS.minX && gx <= BOUNDS.maxX && gz >= (f.buildingRoute ? BUILDING_MIN_Z : BOUNDS.minZ) && gz <= BOUNDS.maxZ) best = choices[0];
+          }
+        } else f.stuckT = 0;
+        if (best) {
+          f.root.position.x = best[0];
+          f.root.position.z = best[1];
+          f.yaw = Math.atan2(best[0] - f.px, best[1] - f.pz);
+          f.anim = f.moveAnim;
+          if (best[2]) f.path.shift();
+        } else f.anim = 'idle';
+      }
+      if (!f.path?.length) {
+        f.path = null;
+        f.anim = f.after;
+        const cb = f.onDone;
+        f.onDone = null;
+        if (cb) cb(f);
       }
     }
+    // Bystanders (guests, the dog, the doorman) never stand inside a car or a prop: they step out of the way.
+    if (!f.noCollide && f.poof === null && f.popIn >= 0.1 && (f.role === 'guest' || f.role === 'dog' || f.role === 'doorman')) {
+      const pos = f.root.position;
+      if (!(f.buildingRoute && pos.z < WALK_Z + 0.55) && pushFromObstacles(pos, f.r)) {
+        f.blockT += dt;
+      } else f.blockT = 0;
+      // Guests and staff give valets personal space; the moving pedestrian yields instead of dragging them.
+      if (!f.noCollide) pushFromPeople(pos, f.r, f, f.buildingRoute && !!f.path && (f.role === 'guest' || f.role === 'dog'));
+      pos.x = THREE.MathUtils.clamp(pos.x, BOUNDS.minX + f.r, BOUNDS.maxX - f.r);
+      pos.z = THREE.MathUtils.clamp(pos.z, (f.buildingRoute ? BUILDING_MIN_Z : BOUNDS.minZ) + f.r, BOUNDS.maxZ - f.r);
+    }
+    const mx = f.root.position.x - f.px, mz = f.root.position.z - f.pz;
+    f.px = f.root.position.x; f.pz = f.root.position.z;
+    f.vs += (Math.min(8, Math.hypot(mx, mz) / Math.max(dt, 1e-4)) - f.vs) * Math.min(1, dt * 10);
     const dy = Math.atan2(Math.sin(f.yaw - f.root.rotation.y), Math.cos(f.yaw - f.root.rotation.y));
     f.root.rotation.y += dy * Math.min(1, dt * 12);
-    posePerson(f);
+    posePerson(f, dt);
 
     let s = 1;
     if (f.popIn < 0.15) { f.popIn = Math.min(0.15, f.popIn + dt); s = f.popIn / 0.15; }
@@ -292,7 +448,7 @@ export function arrivalGuest() {
   const g = spawnFigure('guest', SPAWN.x - 0.7, SPAWN.z + 1.3, 0);
   g.delay = 0.45;
   setAnim(g, 'wave');
-  walkTo(g, ARRIVAL_PATH, 3.3, (f) => poof(f));
+  walkTo(g, arrivalPath(), 3.6, enterBuilding);
 }
 
 // The valet hops out of a car they just parked and waves.

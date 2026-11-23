@@ -3,7 +3,8 @@
 // so a venue is dressing around the same playfield. Tall pieces (towers, cranes, mountains) only show on tall / portrait screens,
 // because the camera looks down at the lot; the low strip behind the top row, the lot surface and the lighting carry the look everywhere.
 import * as THREE from 'three';
-import { renderer, scene } from './core.js';
+import { DOOR } from './config.js';
+import { loader, renderer, scene } from './core.js';
 import { addTextTexture, mat, rig, shell, surf } from './world.js';
 
 /* ---------- theme table ---------- */
@@ -13,8 +14,8 @@ const VENUES = {
     lights: [[0xeab96d, 38], [0xf3cb7a, 15], [0x57a5b1, 12]], ground: 0x0f2431, asphalt: { color: 0x35616f, rough: 0.45, metal: 0.12, tex: null } },
   2: { name: 'Seaside Resort', shell: false, bg: '#8fd6f2', fog: ['#bfe9f7', 0.005], exposure: 1.05, hemi: [0xffffff, 0xd9c79a, 2.3], moon: [0xfff0d0, 3.0, [-10, 24, 10]],
     lights: [[0xffffff, 0], [0xffffff, 0], [0xffffff, 0]], ground: 0xe3cf9c, asphalt: { color: 0xffffff, rough: 0.8, metal: 0, tex: 'paver' } },
-  3: { name: 'Neon Strip Casino', shell: false, bg: '#2a1048', fog: ['#2a1048', 0.007], exposure: 1.5, hemi: [0xc4b0ff, 0x4a3070, 2.3], moon: [0xc8b8ff, 2.6, [-12, 22, 12]],
-    lights: [[0xff3da8, 40], [0x38e8ff, 22], [0xa060ff, 18]], ground: 0x261540, asphalt: { color: 0xffffff, rough: 0.3, metal: 0.3, tex: 'neon' } },
+  3: { name: 'Neon Strip Casino', shell: false, bg: '#3a1a64', fog: ['#3a1a64', 0.006], exposure: 1.6, hemi: [0xd4c4ff, 0x6a4a96, 2.6], moon: [0xc8b8ff, 2.6, [-12, 22, 12]],
+    lights: [[0xff3da8, 40], [0x38e8ff, 22], [0xa060ff, 18]], ground: 0x3a2260, asphalt: { color: 0xffffff, rough: 0.3, metal: 0.3, tex: 'neon' } },
   4: { name: 'Building Site', shell: false, bg: '#e9a86a', fog: ['#d9a066', 0.009], exposure: 1.15, hemi: [0xffe3b8, 0x6a5030, 2.1], moon: [0xffc27a, 2.8, [14, 14, 10]],
     lights: [[0xffb060, 10], [0xffffff, 0], [0xffffff, 0]], ground: 0x8a7048, asphalt: { color: 0xffffff, rough: 0.95, metal: 0, tex: 'dirt' } },
   5: { name: 'Grand Opera House', shell: false, bg: '#2a4258', fog: ['#2a4258', 0.008], exposure: 1.5, hemi: [0xb4cadc, 0x3c5262, 2.3], moon: [0xc0d4e8, 2.6, [-12, 22, 12]],
@@ -35,6 +36,7 @@ export const venueName = (id) => (VENUES[id] || VENUES[1]).name;
 
 /* ---------- state and helpers ---------- */
 let root = null, cache = new Map(), tick = null, built = 0, lotTex = null, gTex = null, T = 0;
+const commercialCache = new Map();
 
 const pick = (a) => a[(Math.random() * a.length) | 0];
 
@@ -117,6 +119,39 @@ function sign(x, y, z, w, h, text, color, bg, border) {
   m.raycast = () => {};
   return put(m, x, y, z);
 }
+
+function commercialBuilding(name, x, z, targetHeight, rotation = 0) {
+  const addModel = (source) => {
+    if (!root) return;
+    const model = source.clone(true);
+    model.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(model);
+    const size = box.getSize(new THREE.Vector3());
+    if (size.y > 0) model.scale.multiplyScalar(targetHeight / size.y);
+    model.updateMatrixWorld(true);
+    const fitted = new THREE.Box3().setFromObject(model);
+    const centre = fitted.getCenter(new THREE.Vector3());
+    model.position.add(new THREE.Vector3(x - centre.x, -fitted.min.y, z - centre.z));
+    model.rotation.y = rotation;
+    model.traverse((o) => {
+      if (o.isMesh) {
+        o.castShadow = true;
+        o.receiveShadow = true;
+      }
+      o.raycast = () => {};
+    });
+    root.add(model);
+  };
+
+  if (commercialCache.has(name)) {
+    addModel(commercialCache.get(name));
+    return;
+  }
+  loader.load(`./assets/kenney-city-commercial/Models/GLB format/${name}`, (gltf) => {
+    commercialCache.set(name, gltf.scene);
+    addModel(gltf.scene);
+  }, undefined, (error) => console.warn(`Commercial backdrop failed: ${name}`, error));
+}
 // A wall of windows painted on a canvas (cheap: one plane instead of hundreds of boxes). Faces +z (towards the camera).
 function facade(x, y, z, w, h, cols, rows, { bg = '#101820', lit = '#ffd27a', p = 0.55, seed = 1 } = {}) {
   const can = document.createElement('canvas');
@@ -142,6 +177,8 @@ function facade(x, y, z, w, h, cols, rows, { bg = '#101820', lit = '#ffd27a', p 
 }
 // The lobby door the guests walk to is at x 10.5: every venue puts a lit entrance there.
 function entrance(zFront) {
+  DOOR.z = zFront;   // guests walk to / from this door
+
   box(10.5, 1.25, zFront - 0.02, 2.1, 2.5, 0.12, M(0x0a0f12, 0.3, 0.5));
   box(10.5, 1.25, zFront + 0.03, 1.7, 2.1, 0.05, E(0xffc87a, 0.9), false);
   glow(10.5, 1.5, zFront + 0.8, 3.4, 0xffc87a, 0.55);
@@ -209,7 +246,7 @@ function lotTexture(kind) {
       for (let r = 0; r < 8; r++) for (let x = -64; x < 256; x += 64) { c.fillStyle = choose(['#d8cbb0', '#c9baa0', '#d2c4a8']); c.fillRect(x + (r % 2) * 32 + 1, r * 32 + 1, 62, 30); }
       break;
     case 'neon':
-      fill('#3a2f66'); speck(500, ['#4a3d82', '#41366f'], 3); grid(64, '#ff3da840', 2); grid(128, '#38e8ff66', 3); speck(24, ['#ffffff'], 2);
+      fill('#4c4088'); speck(500, ['#5c4fa0', '#53478f'], 3); grid(64, '#ff3da840', 2); grid(128, '#38e8ff66', 3); speck(24, ['#ffffff'], 2);
       break;
     case 'dirt':
       fill('#8c7049'); speck(1200, ['#7c6240', '#9b7f55', '#6f5636'], 3);
@@ -270,12 +307,11 @@ function seaside() {
 
 function casino() {
   const pink = E(0xff3da8, 1.6), cyan = E(0x38e8ff, 1.6);
-  box(0, 3.4, -12, 24, 6.8, 4, M(0x120c24, 0.35, 0.3));
-  facade(0, 3.0, -9.98, 23.4, 5.4, 16, 5, { bg: '#140d28', lit: '#ff4fd8', p: 0.5, seed: 5 });
+  commercialBuilding('building-l.glb', -8.8, -16.8, 6.2, 0);
+  commercialBuilding('building-m.glb', 1.0, -17.2, 6.6, 0);
+  commercialBuilding('building-n.glb', 10.8, -16.8, 6.0, 0);
   box(0, 6.85, -9.95, 24.2, 0.14, 0.14, pink, false);
   box(0, 0.2, -9.95, 24.2, 0.14, 0.14, cyan, false);
-  box(-12.1, 3.5, -9.95, 0.14, 6.8, 0.14, pink, false);
-  box(12.1, 3.5, -9.95, 0.14, 6.8, 0.14, cyan, false);
   const lucky = sign(0, 7.6, -9.5, 8, 1.6, 'LUCKY 7', '#ffdf5a', '#1a0630', '#ff3da8');
   box(10.5, 3.0, -9.5, 3.4, 0.18, 1.4, cyan, false);
   entrance(-9.9);
@@ -337,11 +373,10 @@ function opera() {
   const stone = M(0xcfc8b6, 0.6), col = M(0xe3dccb, 0.5);
   box(0, 0.12, -9.1, 17, 0.24, 1.2, M(0x8d887c, 0.8));
   box(0, 0.36, -9.7, 15, 0.24, 1.2, M(0x8d887c, 0.8));
-  box(0, 3.2, -12.4, 24, 6.4, 4.6, stone);
-  facade(0, 2.6, -10.08, 23, 3.4, 10, 2, { bg: '#2a2a34', lit: '#ffcf80', p: 0.6, seed: 6 });
+  commercialBuilding('building-h.glb', -7.2, -16.8, 6.0, 0);
+  commercialBuilding('building-j.glb', 2.4, -17.2, 6.4, 0);
+  commercialBuilding('building-i.glb', 11.0, -16.8, 5.8, 0);
   for (let x = -6; x <= 6; x += 2) cyl(x, 2.8, -9.4, 0.34, 0.4, 5.2, col);
-  box(0, 5.55, -9.2, 14.4, 0.7, 1.6, M(0xd6cfbd, 0.6));
-  roof(0, 5.9, -9.2, 7.4, 2.0, 1.6, M(0xc9c1ae, 0.6), true);
   sign(0, 5.55, -8.35, 6, 0.6, 'GRAND OPERA', '#ffe08a', '#1b1b24', '#d6b674');
   ball(0, 7.4, -12.4, 3.2, M(0x3b7a6e, 0.35, 0.5), 1, 0.75, 1);
   entrance(-10.06);
@@ -349,8 +384,9 @@ function opera() {
 }
 
 function airport() {
-  box(0, 2.2, -12.4, 29, 4.4, 4.6, M(0xe4eaf0, 0.5));
-  facade(0, 2.0, -10.08, 28, 3.0, 18, 2, { bg: '#4f86ad', lit: '#d4ecff', p: 0.85, seed: 9 });
+  commercialBuilding('low-detail-building-wide-a.glb', -8.8, -16.8, 3.8, 0);
+  commercialBuilding('low-detail-building-wide-b.glb', 1.2, -17.2, 4.1, 0);
+  commercialBuilding('low-detail-building-wide-a.glb', 10.8, -16.8, 3.8, 0);
   box(0, 4.7, -9.6, 30, 0.3, 3.4, M(0xffffff, 0.35, 0.1));
   box(0, 4.5, -7.95, 30, 0.08, 0.08, M(0xffc247, 0.4), false);
   for (let x = -13; x <= 13; x += 4.33) cyl(x, 2.35, -8.1, 0.14, 0.14, 4.7, M(0xb8c2cc, 0.3, 0.7), 8);
@@ -514,6 +550,7 @@ export function applyVenue(id = 1) {
   if (gTex) gTex.dispose();
   gTex = glowTexture();
   T = 0;
+  DOOR.z = -9.08;   // the hotel's door; the other venues' entrance() moves it
   if (BUILD[key]) BUILD[key]();
 }
 

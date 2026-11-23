@@ -159,15 +159,15 @@ function newId() {
 function pickQuirk() {
   if (G.mode === 'rush') {                            // each shift lists which quirks may appear
     const list = rush.lv.quirks;
-    if (!list.length || G.rngCars() >= 0.15 + rush.lv.diff * 0.04) return null;
-    return list[Math.floor(G.rngCars() * list.length)];
+    if (!list.length || Math.random() >= 0.15 + rush.lv.diff * 0.04) return null;
+    return list[Math.floor(Math.random() * list.length)];
   }
   const d = difficulty();
   if (d < 2) return null;
-  if (G.rngCars() >= Math.min(0.5, 0.1 + d * 0.08)) return null;
+  if (Math.random() >= Math.min(0.5, 0.1 + d * 0.08)) return null;
   const avail = QUIRK_ORDER.slice(0, Math.min(QUIRK_ORDER.length, d - 1));
   const newest = avail[avail.length - 1];
-  return G.rngCars() < 0.5 ? newest : avail[Math.floor(G.rngCars() * avail.length)];
+  return Math.random() < 0.5 ? newest : avail[Math.floor(Math.random() * avail.length)];
 }
 
 export function makeRandomCar(withExtras = true) {
@@ -178,8 +178,8 @@ export function makeRandomCar(withExtras = true) {
   let file, colorIndex;
   const pool = paintPool();
   for (let t = 0; t < 40; t++) {
-    file = MODEL_FILES[Math.floor(G.rngCars() * MODEL_FILES.length)];
-    colorIndex = pool[Math.floor(G.rngCars() * pool.length)];
+    file = MODEL_FILES[Math.floor(Math.random() * MODEL_FILES.length)];
+    colorIndex = pool[Math.floor(Math.random() * pool.length)];
     if (!parked.some((c) => c.file === file && c.colorIndex === colorIndex)) break;
   }
 
@@ -188,19 +188,19 @@ export function makeRandomCar(withExtras = true) {
     quirk = pickQuirk();
     const d = difficulty();
     if (G.mode === 'rush') {
-      vip = G.rngCars() < rush.lv.vipRate;
+      vip = Math.random() < rush.lv.vipRate;
       if (rush.vipNext > 0) { vip = true; rush.vipNext--; }
-      if (!vip && !tutorial.on && rush.lv.diff >= 2 && G.rngCars() < Math.min(0.3, 0.05 + rush.lv.diff * 0.02)) {
-        special = SPECIAL_KEYS[Math.floor(G.rngCars() * SPECIAL_KEYS.length)];
+      if (!vip && !tutorial.on && rush.lv.diff >= 2 && Math.random() < Math.min(0.3, 0.05 + rush.lv.diff * 0.02)) {
+        special = SPECIAL_KEYS[Math.floor(Math.random() * SPECIAL_KEYS.length)];
       }
     }
-    else if (d >= 3 && G.rngCars() < Math.min(0.25, 0.06 + d * 0.03)) vip = true;
+    else if (d >= 3 && Math.random() < Math.min(0.25, 0.06 + d * 0.03)) vip = true;
   }
   return makeCar(file, CAR_COLORS[colorIndex], id, colorIndex, quirk, vip, special);
 }
 
 export function seedCars(n = 2, showTags = true, reveal = 0) {
-  const pool = shuffle(openSlots(), G.rngCars).slice(0, n);
+  const pool = shuffle(openSlots()).slice(0, n);
   for (const s of pool) {
     const car = makeRandomCar(false);
     car.parked = true;
@@ -208,13 +208,17 @@ export function seedCars(n = 2, showTags = true, reveal = 0) {
     car.tagTimer = showTags ? reveal : 0;
     car.slot = s;
     s.car = car;
-    placeCar(car, s.x, s.z, parkYaw());
+    placeCar(car, s.x, s.z, parkYaw(s));
   }
 }
 
 export function resetLot() {
   cancelPeek();
-  endCall();
+  for (const call of [...rush.calls]) endCall(call);
+  rush.calls = [];
+  rush.waiting = null;
+  rush.inbound = null;
+  rush.near = null;
   clearFigures();
   clearToken();
   clearFx();

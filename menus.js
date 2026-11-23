@@ -2,7 +2,7 @@
 import { resetLot, seedCars } from './cars.js';
 import { start } from './classic.js';
 import { BAY_THEMES, CONFETTI, HATS, HORNS, levelMods, LEVELS, OUTFITS, PAINTS } from './config.js';
-import { $, applyModeHud, audio, modelCache, setSeeds, TITLE_HTML, toast, ui } from './core.js';
+import { $, applyModeHud, audio, modelCache, TITLE_HTML, toast, ui } from './core.js';
 import { cancelPeek } from './input.js';
 import * as platform from './platform.js';
 import { equip, equippedItem, isLevelUnlocked, isUnlocked, levelBest, levelInfo, levelStars, runLogSummary, save, totalStars } from './progress.js';
@@ -109,14 +109,16 @@ export function showTitle() {
   G.running = false;
   G.paused = false;
   G.mode = 'classic';
+  rush.sceneLab = false;
   applyModeHud();
   G.phase = 'arrival';
   tutorial.on = false;
+  const timeLabel = document.getElementById('timeLabel');
+  if (timeLabel) timeLabel.textContent = 'TIME';
   rush.picking = false;
   audio.musicStop(0.5);
   platform.gameplayStop();
   applyLevelLayout(null);
-  setSeeds(false);
   resetLot();
   seedCars(2, false);
   document.body.classList.add('menu');
@@ -130,7 +132,7 @@ export function showTitle() {
 function buildPause() {
   G.pauseOverlay = document.createElement('div');
   G.pauseOverlay.className = 'overlay hide';
-  G.pauseOverlay.innerHTML = `<div class="hero"><div class="hero-eyebrow">NOCTURNE HOTEL · ON BREAK</div><h1>Shift <em>paused.</em></h1><p>The guests can wait a moment. Your clock is stopped.</p><button class="play" id="resume">Resume</button><button class="play ghost" id="skipTut" style="display:none">Skip tutorial</button><button class="play ghost" id="pauseMenu">Main menu</button><div class="hero-foot">ESC OR P TO RESUME</div></div>`;
+  G.pauseOverlay.innerHTML = `<div class="hero"><div class="hero-eyebrow">NOCTURNE HOTEL · ON BREAK</div><h1>Shift <em>paused.</em></h1><p>The guests can wait a moment. Your clock is stopped.</p><button class="play" id="resume">Resume</button><button class="play ghost" id="skipTut" style="display:none">Skip tutorial</button><button class="play ghost" id="pauseSceneLab" style="display:none">Choose another scene</button><button class="play ghost" id="pauseMenu">Main menu</button><div class="hero-foot">P OR THE PAUSE BUTTON TO RESUME</div></div>`;
   document.body.appendChild(G.pauseOverlay);
   G.pauseOverlay.querySelector('#resume').addEventListener('click', () => setPaused(false));
   G.pauseOverlay.querySelector('#pauseMenu').addEventListener('click', () => {
@@ -139,6 +141,13 @@ function buildPause() {
     audio.pause(false);
     keys.clear();
     showTitle();
+  });
+  G.pauseOverlay.querySelector('#pauseSceneLab').addEventListener('click', () => {
+    G.pauseOverlay.classList.add('hide');
+    G.paused = false;
+    audio.pause(false);
+    keys.clear();
+    showSceneLab();
   });
   G.pauseOverlay.querySelector('#skipTut').addEventListener('click', () => {
     G.pauseOverlay.classList.add('hide');
@@ -157,6 +166,7 @@ export function setPaused(p) {
   if (!G.pauseOverlay) buildPause();
   G.pauseOverlay.classList.toggle('hide', !p);
   G.pauseOverlay.querySelector('#skipTut').style.display = tutorial.on ? '' : 'none';
+  G.pauseOverlay.querySelector('#pauseSceneLab').style.display = rush.sceneLab ? '' : 'none';
   audio.pause(p);
 }
 
@@ -177,11 +187,17 @@ export function addPauseUI() {
   });
 }
 
-export function setTitleButtons() {
-  const ready = modelCache.size > 0;
+export function setTitleButtons(savesReady = true) {
+  const ready = savesReady && modelCache.size > 0;
   const a = $('#start'), b = $('#startRush');
+  const log = $('#logBtn');
+  const sceneLab = $('#sceneLabBtn');
   if (a) a.textContent = ready ? 'Memory' : 'Loading…';
   if (b) b.textContent = ready ? 'Duel' : 'Loading…';
+  document.querySelectorAll('#start, #startRush, #tutorialBtn, #levelsBtn, #locker, #logBtn, #sceneLabBtn')
+    .forEach((el) => { el.disabled = !ready; });
+  if (log) log.hidden = !new URLSearchParams(location.search).has('debug');
+  if (sceneLab) sceneLab.hidden = !new URLSearchParams(location.search).has('debug');
 }
 
 // The shift the Shifts button plays: the first unlocked one with no stars yet, else the first not at 3 stars.
@@ -208,6 +224,30 @@ export function bindTitle() {
   on('#locker', showLocker);
   on('#logBtn', copyPlaytestLog);
   on('#levelsBtn', () => { audio.ensure(); showLevelSelect(); });
+  on('#sceneLabBtn', () => { audio.ensure(); showSceneLab(); });
+}
+
+// Unlocked-only campaign selection remains unchanged; the scene lab is an explicit, non-recording test path.
+export function showSceneLab() {
+  showTitle();
+  applyLevelLayout(null);
+  const handlers = { sceneLabBack: showTitle };
+  const cards = LEVELS.map((lv) => {
+    const id = `scene_${lv.id}`;
+    handlers[id] = () => startRush({ level: lv.id, sceneLab: true });
+    const mods = levelMods(lv).map((m) => `<span class="mod">${m.icon} ${m.name}</span>`).join('');
+    return `<button class="lvl-card" id="${id}">
+      <b><i>${lv.id}</i>${lv.name}</b>
+      <span class="tag">📍 ${venueName(lv.id)} · ${lv.tagline}</span>
+      <div class="mods">${mods}</div>
+      <div class="meta"><span>Scene &amp; parking layout</span><span>${lv.bays.length} bays</span></div></button>`;
+  }).join('');
+  showCard(`
+    <div class="hero-eyebrow">DEVELOPER PLAYTEST · NO CAMPAIGN PROGRESS</div>
+    <h1 style="font-size:clamp(34px,6vw,50px)">Scene <em>lab.</em></h1>
+    <p style="font-size:16px">Every venue is available. Walk and drive the real layout; runs here do not affect stars, scores, XP, or saves. Pause to return and pick another scene.</p>
+    <div class="levels">${cards}</div>
+    <button class="play ghost" id="sceneLabBack">Back</button>`, handlers);
 }
 
 // Level select: every shift with its stars, best score and what makes it different.

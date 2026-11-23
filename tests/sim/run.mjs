@@ -29,7 +29,7 @@ function bot(mode) {
   const pl = rush.pl;
   if (!pl) return;
   if (mode === 'afk') return;
-  if (mode === 'onepark' && rush.parked >= 1) { if (pl.mode === 'foot') { pl.x = 12.5; pl.z = -7; } return; }   // wanders off to a corner
+  if (mode === 'onepark' && rush.parked >= 1) { if (pl.mode === 'foot') { pl.x = 12.5; pl.z = -7; if (pl.fig) pl.fig.root.position.set(pl.x, 0.02, pl.z); } return; }   // wanders off to a corner
   if (pl.mode === 'foot') {
     const w = rush.waiting && rush.waiting.waiting ? rush.waiting : null;
     const call = rush.calls.find((c) => c.state === 'waiting');
@@ -38,9 +38,11 @@ function bot(mode) {
   } else if (G.activeCar) {
     const c = G.activeCar;
     c.vx = c.vz = c.speed = 0;
-    if (c.delivering) { c.x = cfg.HANDOFF.x; c.z = cfg.HANDOFF.z; }
-    else if (c.slot) { c.x = c.slot.x; c.z = c.slot.z; c.yaw = core.parkYaw(); }
+    if (c.delivering) { c.x = cfg.HANDOFF.x; c.z = cfg.HANDOFF.z; c.yaw = cfg.HANDOFF_YAW; }
+    else if (c.slot) { c.x = c.slot.x; c.z = c.slot.z; c.yaw = core.parkYaw(c.slot); }
   }
+  // The headless bot moves the state directly; keep the rendered/collision figure in sync with that shortcut.
+  if (pl.mode === 'foot' && pl.fig) pl.fig.root.position.set(pl.x, 0.02, pl.z);
 }
 
 export function sim(level, mode, maxSim = 900) {

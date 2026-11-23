@@ -11,17 +11,87 @@ export const JAR_BONUS = 10;
 export const BOUNDS = { minX: -14.25, maxX: 14.25, minZ: -7.6, maxZ: 8.4 };
 export const SPAWN = { x: -9.6, z: 6.5, yaw: Math.PI / 2 };
 export const EXIT_LANE_BACK = -1.72;   // gap between the two bay rows
-export const EXIT_LANE_FRONT = 5.6;    // open lane in front of the bottom row
+export const EXIT_LANE_FRONT = 7.6;    // clear the planter and front curb before turning out
+// Bay centres [x, z]: the back row (z < 0) then the front row.
+export const SLOT_POSITIONS = [
+  [-9.1, -4.55], [-3.05, -4.55], [3.05, -4.55], [9.1, -4.55],
+  [-9.1, 1.12], [-3.05, 1.12], [3.05, 1.12], [9.1, 1.12],
+];
+// Per-shift stall-centre offsets in the same order as SLOT_POSITIONS. The offsets keep every bay
+// inside the lot, but make the physical rows stagger or fan out so each shift has a distinct plan.
+export const PARKING_LAYOUTS = {
+  1: [[0,0],[0,0],[0,0],[0,0],[0,0],[0,0],[0,0],[0,0]],
+  2: [[-0.7,0],[0,0.4],[0,0],[0.7,0.4],[0.7,0], [0,-0.4], [0,-0.4],[-0.7,0]],
+  3: [[0,0.4],[0.7,0],[0,0],[-0.7,0.4],[-0.7,-0.4],[0,0],[0.7,0], [0,-0.4]],
+  4: [[0,-0.4],[-0.7,0],[0.7,0], [0,0.4], [0.7,-0.4], [0,0],[-0.7,0],[0,0.4]],
+  5: [[-0.75,0],[0,0.35],[0,-0.35],[0.75,0],[-0.45,0.4],[0.45,-0.4],[-0.45,-0.4],[0.45,0.4]],
+  6: [[0,0],[0.7,0.4],[-0.7,-0.4],[0,0],[0,0],[0.7,-0.4],[-0.7,0.4],[0,0]],
+  7: [[0.5,0],[0,0],[-0.5,0],[0,0],[0,0],[0.5,0],[-0.5,0],[0,0]],
+  8: [[-0.6,0.4],[0,0],[0,0],[0.6,0.4],[0.6,-0.4],[0,0],[0,-0.4],[-0.6,-0.4]],
+  9: [[0,-0.4],[0.7,0],[0,0],[-0.7,0.4],[-0.7,-0.4],[0,0],[0.7,0],[0,0.4]],
+  10: [[-0.7,0.35],[0,0],[0.7,-0.35],[0,0.35],[0.7,0],[0,-0.35],[-0.7,0],[0,-0.35]],
+};
+// Stall/aisle archetypes. `oblique` uses paired 60-degree banks; `island` adds a planted median
+// in the centre aisle; the remaining shifts use 90-degree rows with different spacing and bay masks.
+export const PARKING_TYPES = {
+  1: '90', 2: '90-staggered', 3: '60-oblique', 4: '90-island', 5: '60-oblique',
+  6: '90-island', 7: '90-compact', 8: '90-gala-island', 9: '60-island', 10: '60-finale-island',
+};
+
+// Pilot layouts for three venues. Each bay has an exact centre and heading.
+// SLOT_POSITIONS and bay masks stay unchanged, so scoring and unlocks need no migration.
+export const SLOT_LAYOUTS = {
+  3: [
+    { x: -10.2, z: -4.8, yaw: Math.PI * 0.5 },
+    { x: -5.8, z: -5.3, yaw: Math.PI * 0.75 },
+    { x: 5.8, z: -5.3, yaw: Math.PI * 1.25 },
+    { x: 10.2, z: -4.8, yaw: Math.PI * 1.5 },
+    { x: -10.2, z: 3.8, yaw: Math.PI * 0.5 },
+    { x: -5.8, z: 5.1, yaw: Math.PI * 0.25 },
+    { x: 5.8, z: 5.1, yaw: Math.PI * 1.75 },
+    { x: 10.2, z: 3.8, yaw: Math.PI * 1.5 },
+  ],
+  5: [
+    { x: -9.8, z: -4.8, yaw: Math.PI * 0.5 },
+    { x: -5.2, z: -4.8, yaw: Math.PI * 0.5 },
+    { x: 5.2, z: -4.8, yaw: Math.PI * 1.5 },
+    { x: 9.8, z: -4.8, yaw: Math.PI * 1.5 },
+    { x: -9.8, z: 3.8, yaw: Math.PI * 0.5 },
+    { x: -5.2, z: 3.8, yaw: Math.PI * 0.5 },
+    { x: 5.2, z: 3.8, yaw: Math.PI * 1.5 },
+    { x: 9.8, z: 3.8, yaw: Math.PI * 1.5 },
+  ],
+  6: [
+    { x: -9.8, z: -5.2, yaw: 0 },
+    { x: -3.3, z: -5.2, yaw: 0 },
+    { x: 3.3, z: -5.2, yaw: 0 },
+    { x: 9.8, z: -5.2, yaw: 0 },
+    { x: -9.8, z: 5.8, yaw: Math.PI },
+    { x: -3.3, z: 5.8, yaw: Math.PI },
+    { x: 3.3, z: 5.8, yaw: Math.PI },
+    { x: 9.8, z: 5.8, yaw: Math.PI },
+  ],
+};
 export const PARKED_HALF = { x: 0.95, z: 1.45 }; // collision box of a parked car
-export const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+export const reduceMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /* ---------- lot layout (people and rings) ---------- */
-export const DOOR = { x: 10.5, z: -8.9 };                                          // lobby door guests come out of
+export const DOOR = { x: 10.5, z: -9.08 };                                         // lobby door: z is the front plane of the door. venues.js moves it to each venue's real door
+export const BUILDING_MIN_Z = -12.2;                                              // how far behind the lot edge a guest may walk to reach any venue's door (the deepest door is ~-10.8)
+export const WALK_Z = -6.85;                                                       // the sidewalk strip between the top bay row and the building
 export const GUEST_PATH = [[11.4, -7.7], [11.4, -1.7], [12.2, 0.4], [12.2, 6.2], [12.6, 6.9]]; // door -> pick-up curb
-export const ARRIVAL_PATH = [[-11.4, 6.3], [-11.4, -7.7], [-10.5, -8.8]];          // arriving guest -> lobby door (Classic)
+// Walking in: along the left column, then along the sidewalk to the door, and through it (the figure is removed once it is inside).
+const toDoor = () => [[DOOR.x, WALK_Z], [DOOR.x, DOOR.z + 0.5], [DOOR.x, DOOR.z - 0.45]];
+export const arrivalPath = () => [[-11.4, 6.3], [-11.4, WALK_Z], ...toDoor()];     // arriving guest -> lobby door (Classic)
+export const dropPath = () => [[-11.4, 3.2], [-11.4, WALK_Z], ...toDoor()];        // dropped-off guest -> lobby door
+export const exitPath = () => [[DOOR.x, DOOR.z + 0.6], ...GUEST_PATH];             // lobby door -> pick-up curb
 export const HANDOFF = { x: 10.4, z: 5.4 };                                        // pick-up ring (Rush Hour)
 export const DROPOFF = { x: -10.4, z: 5.9 };                                       // drop-off ring (Rush Hour)
-export const DROP_PATH = [[-11.4, 3.2], [-11.4, -7.7], [-10.5, -8.8]];             // dropped-off guest -> lobby door
+export const HANDOFF_YAW = Math.PI / 2;
+export const PARK_ANGLE = 0.35;
+export const HANDOFF_ANGLE = PARK_ANGLE;
+
+export const angleDifference = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
 
 /* ---------- Rush Hour ---------- */
 export const TOKEN_SPOTS = [[-6, -1.72], [0, -1.72], [6, -1.72], [-3, 5.4], [3, 5.4], [5, 5.4], [0, 3.2], [6, 3.2]];
@@ -55,31 +125,30 @@ export const RUSH_PERKS = [
      bays        indexes (0-3 top row, 4-7 bottom row) of the bays that are open; the rest are closed
      park        'nose' (drive in) or 'reverse' (back in: the nose must face out)
      grip        1 = normal tyres, lower = slippery      ringScale / speedScale  < 1 makes parking harder
-     cones       [x, z] solid cones      cart  { z, x0, x1, speed }: a luggage cart sweeping the lot
      vipRate     chance a car is a VIP    quirks  which quirk cars may appear    gap  seconds between arrivals
    `stars` (tip goals) are no longer used for the star rating: stars come from beating the rival (see duelGoals).
    The rival speeds and the duel goals are first estimates: tune them after playtests. */
 export const LEVELS = [
   { id: 1, name: 'Welcome Shift', tagline: 'Four bays, wide rings, no surprises.', secs: 210, guests: 10, stars: [180, 260, 350], diff: 1, calls: 1, callsFrom: 5,
     bays: [1, 2, 5, 6], park: 'nose', grip: 1, ringScale: 1.2, speedScale: 1.1, cones: [], cart: null, vipRate: 0, quirks: [], gap: 0.8 },
-  { id: 2, name: 'Lunch Rush', tagline: 'The whole lot is open and guests start leaving.', secs: 240, guests: 11, stars: [210, 310, 420], diff: 2, calls: 1, callsFrom: 10,
-    bays: [0, 1, 2, 3, 4, 5, 6, 7], park: 'nose', grip: 1, ringScale: 1, speedScale: 1, cones: [], cart: null, vipRate: 0, quirks: [], gap: 0.5 },
-  { id: 3, name: 'Reverse Night', tagline: 'Back into the bay. The nose must face out.', secs: 240, guests: 11, stars: [210, 310, 420], diff: 3, calls: 1, callsFrom: 10,
-    bays: [0, 1, 2, 3, 5, 6], park: 'reverse', grip: 1, ringScale: 1.1, speedScale: 1, cones: [], cart: null, vipRate: 0, quirks: [], gap: 0.5 },
-  { id: 4, name: 'Cone Alley', tagline: 'Traffic cones turn the approach into a slalom.', secs: 275, guests: 13, stars: [240, 360, 490], diff: 4, calls: 2, callsFrom: 10,
-    bays: [0, 1, 2, 3, 4, 5, 6, 7], park: 'nose', grip: 1, ringScale: 1, speedScale: 1, cones: [[-6.5, 5.0], [-3, 6.6], [0.5, 5.0], [4, 6.6]], cart: null, vipRate: 0.1, quirks: ['brakes'], gap: 0.4 },
-  { id: 5, name: 'Rainy Evening', tagline: 'Wet tarmac. Brake early and steer gently.', secs: 275, guests: 13, stars: [240, 360, 490], diff: 5, calls: 2, callsFrom: 8,
-    bays: [0, 1, 2, 3, 4, 5, 6, 7], park: 'nose', grip: 0.45, ringScale: 1.1, speedScale: 1, cones: [], cart: null, vipRate: 0.1, quirks: ['brakes', 'wide'], gap: 0.4 },
-  { id: 6, name: 'Cart Crossing', tagline: 'A bellhop is pushing a luggage cart across the lot.', secs: 305, guests: 15, stars: [280, 420, 560], diff: 6, calls: 2, callsFrom: 8,
-    bays: [0, 1, 2, 3, 4, 5, 6, 7], park: 'nose', grip: 1, ringScale: 1, speedScale: 1, cones: [], cart: { z: 5.0, x0: -7, x1: 7, speed: 0.55 }, vipRate: 0.1, quirks: ['wide'], gap: 0.4 },
+  { id: 2, name: 'Lunch Rush', tagline: 'Staggered 90-degree rows leave a clear curb route.', secs: 240, guests: 11, stars: [210, 310, 420], diff: 2, calls: 1, callsFrom: 10,
+    bays: [0, 1, 2, 4, 5, 6], park: 'nose', grip: 1, ringScale: 1, speedScale: 1, cones: [], cart: null, vipRate: 0, quirks: [], gap: 0.5 },
+  { id: 3, name: 'Casino Roundabout', tagline: 'Reverse around the fountain and between angled bays.', secs: 240, guests: 11, stars: [210, 310, 420], diff: 3, calls: 1, callsFrom: 10,
+    bays: [0, 2, 4, 6], park: 'reverse', grip: 1, ringScale: 1.1, speedScale: 1, cones: [], cart: null, vipRate: 0, quirks: [], gap: 0.5 },
+  { id: 4, name: 'Cone Alley', tagline: 'Work around the planted median and traffic cones.', secs: 275, guests: 13, stars: [240, 360, 490], diff: 4, calls: 2, callsFrom: 10,
+    bays: [0, 2, 4, 5, 7], park: 'nose', grip: 1, ringScale: 1, speedScale: 1, cones: [[-6.5, 5.0], [-3, 6.6], [0.5, 5.0], [4, 6.6]], cart: null, vipRate: 0.1, quirks: ['brakes'], gap: 0.4 },
+  { id: 5, name: 'Opera Red Carpet', tagline: 'Flank the red carpet through two angled bay columns.', secs: 275, guests: 13, stars: [240, 360, 490], diff: 5, calls: 2, callsFrom: 8,
+    bays: [0, 1, 2, 3], park: 'nose', grip: 0.45, ringScale: 1.1, speedScale: 1, cones: [], cart: null, vipRate: 0.1, quirks: ['brakes', 'wide'], gap: 0.4 },
+  { id: 6, name: 'Terminal Run', tagline: 'Work curb-side bays along both edges of the terminal.', secs: 305, guests: 15, stars: [280, 420, 560], diff: 6, calls: 2, callsFrom: 8,
+    bays: [4, 5, 6, 7], park: 'nose', grip: 1, ringScale: 1, speedScale: 1, cones: [], cart: null, vipRate: 0.1, quirks: ['wide'], gap: 0.4 },
   { id: 7, name: 'Tight Squeeze', tagline: 'Only four bays open and the rings are tiny.', secs: 240, guests: 11, stars: [210, 310, 420], diff: 7, calls: 2, callsFrom: 8,
     bays: [0, 2, 5, 7], park: 'nose', grip: 1, ringScale: 0.72, speedScale: 0.8, cones: [], cart: null, vipRate: 0.15, quirks: ['brakes', 'wide'], gap: 0.3 },
   { id: 8, name: 'VIP Gala', tagline: 'Half the guests are VIPs: park them fast for double tips.', secs: 305, guests: 15, stars: [280, 420, 560], diff: 8, calls: 2, callsFrom: 8,
-    bays: [0, 1, 2, 3, 4, 5, 6, 7], park: 'nose', grip: 1, ringScale: 1, speedScale: 1, cones: [], cart: null, vipRate: 0.5, quirks: ['leaky', 'horn'], gap: 0.3 },
-  { id: 9, name: 'Valet Storm', tagline: 'Rain, cones and three guests at the curb.', secs: 340, guests: 17, stars: [320, 470, 630], diff: 9, calls: 3, callsFrom: 6,
-    bays: [0, 1, 2, 3, 4, 5, 6, 7], park: 'nose', grip: 0.6, ringScale: 1, speedScale: 1, cones: [[-5, 5.0], [1, 6.6]], cart: null, vipRate: 0.2, quirks: ['brakes', 'wide', 'leaky', 'horn'], gap: 0.3 },
-  { id: 10, name: 'Midnight Finale', tagline: 'Reverse parking, a luggage cart and VIPs.', secs: 370, guests: 19, stars: [350, 520, 700], diff: 10, calls: 3, callsFrom: 6,
-    bays: [0, 1, 2, 3, 4, 5, 6, 7], park: 'reverse', grip: 1, ringScale: 0.9, speedScale: 0.9, cones: [], cart: { z: 5.0, x0: -7, x1: 7, speed: 0.7 }, vipRate: 0.35, quirks: ['brakes', 'wide', 'leaky', 'horn'], gap: 0.25 },
+    bays: [1, 3, 4, 6, 7], park: 'nose', grip: 1, ringScale: 1, speedScale: 1, cones: [], cart: null, vipRate: 0.5, quirks: ['leaky', 'horn'], gap: 0.3 },
+  { id: 9, name: 'Valet Storm', tagline: '60-degree stalls, slick lanes and a planted island.', secs: 340, guests: 17, stars: [320, 470, 630], diff: 9, calls: 3, callsFrom: 6,
+    bays: [0, 1, 3, 4, 6], park: 'nose', grip: 0.6, ringScale: 1, speedScale: 1, cones: [[-5, 5.0], [1, 6.6]], cart: null, vipRate: 0.2, quirks: ['brakes', 'wide', 'leaky', 'horn'], gap: 0.3 },
+  { id: 10, name: 'Midnight Finale', tagline: 'Reverse into angled bays around the garden median.', secs: 370, guests: 19, stars: [350, 520, 700], diff: 10, calls: 3, callsFrom: 6,
+    bays: [0, 2, 3, 5, 6, 7], park: 'reverse', grip: 1, ringScale: 0.9, speedScale: 0.9, cones: [], cart: null, vipRate: 0.35, quirks: ['brakes', 'wide', 'leaky', 'horn'], gap: 0.25 },
 ];
 
 // Rival duel: you win a shift by parking and returning MORE cars than the AI rival valet (1 star).
@@ -94,23 +163,23 @@ export const duelStars = (lv, margin) => duelGoals(lv).filter((g) => margin >= g
 // Short labels for the rules that make a shift different (shown on the level card and the shift intro).
 export function levelMods(lv) {
   const m = [];
+  const layout = PARKING_TYPES[lv.id] || '90';
+  m.push({ icon: layout.includes('60') ? '↗' : '↕', name: layout.includes('60') ? '60° angled bays' : '90° bays' });
+  if (layout.includes('island')) m.push({ icon: '🌿', name: 'Garden median' });
   if (lv.park === 'reverse') m.push({ icon: '🔄', name: 'Reverse parking' });
   if (lv.bays.length < 8) m.push({ icon: '🔒', name: `${lv.bays.length} bays open` });
   if (lv.ringScale < 1) m.push({ icon: '🎯', name: 'Tiny rings' });
-  if (lv.grip < 1) m.push({ icon: '🌧️', name: 'Slippery' });
+  if (lv.grip < 1) m.push({ icon: '🧊', name: 'Slippery' });
   if (lv.cones.length) m.push({ icon: '🚧', name: 'Cones' });
   if (lv.cart) m.push({ icon: '🧳', name: 'Luggage cart' });
   if (lv.vipRate >= 0.3) m.push({ icon: '⭐', name: 'VIP gala' });
   if (lv.calls >= 3) m.push({ icon: '🔔', name: `${lv.calls} guests at once` });
   return m;
 }
-// The Daily Run plays one of the harder shifts, chosen by the date.
-export const DAILY_LEVEL_IDS = [3, 4, 5, 6, 7, 8, 9, 10];
-
 /* ---------- cars ---------- */
 export const MODEL_FILES = ['sedan.glb', 'suv-luxury.glb', 'sedan-sports.glb', 'hatchback-sports.glb', 'taxi.glb'];
 
-// The first eight paints are always in the lot; the rest unlock with player level (never used in the Daily Run).
+// The first eight paints are always in the lot; the rest unlock with player level.
 export const PAINTS = [
   { color: 0xd5b66e, name: 'Gold' }, { color: 0x5d8792, name: 'Teal' }, { color: 0x9d4f47, name: 'Red' },
   { color: 0x65745c, name: 'Green' }, { color: 0x858a8d, name: 'Silver' }, { color: 0x312f34, name: 'Charcoal' },

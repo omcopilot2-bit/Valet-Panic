@@ -1,5 +1,10 @@
 Sound credits (all CC0 / public domain, no attribution required)
-- engine_loop.ogg: "file0375.mp3" by saphix (freesound.org/people/saphix/sounds/36794/), CC0, via OpenTTD OpenSFX (osfx_25), looped.
+- assets/sounds/engines/loop_0.wav, loop_1_0.wav, loop_2_0.wav, loop_3_0.wav, loop_4_0.wav, loop_5_0.wav: “Racing car engine sound loops” by domasx2 (opengameart.org/content/racing-car-engine-sound-loops), CC0. Six pitch-matched loop layers crossfaded across engine RPM.
+- engine_loop.ogg: "file0375.mp3" by saphix (freesound.org/people/saphix/sounds/36794/), CC0, via OpenTTD OpenSFX (osfx_25); legacy asset retained but no longer used for the continuous engine sound.
 - horn.ogg: "Industrial Air Horn" by mcpable (freesound.org/people/mcpable/sounds/131930/), CC0, via OpenTTD OpenSFX (osfx_26), isolated.
 - bump_heavy.ogg, bump_light.ogg: Kenney Impact Sounds (kenney.nl), CC0.
 - door.ogg, coins.ogg: Kenney RPG Audio (kenney.nl), CC0.
+
+Kenney City Kit (Commercial) building models
+- assets/kenney-city-commercial/Models/GLB format/*.glb: Kenney (kenney.nl), CC0.
+- Commercial kit license: assets/kenney-city-commercial/License.txt

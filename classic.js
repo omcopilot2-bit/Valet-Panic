@@ -1,7 +1,7 @@
 // Classic mode: park each guest in an assigned bay, remember the ID, hand back the right car. Also the Classic HUD and perk screens.
 import { disposeCar, makeRandomCar, placeCar, quirkLine, resetLot, seedCars, updateTags } from './cars.js';
 import { COLOR_NAMES, EXIT_LANE_BACK, EXIT_LANE_FRONT, JAR_BONUS, JAR_SIZE, MAX_LIVES, PEEK_COST, PERKS, QUIRKS, reduceMotion, SPAWN, TAG_TIME, VIP_WINDOW } from './config.js';
-import { applyModeHud, audio, coach, colorHex, comboMul, confetti, formatTime, freeGuesses, markAllSlots, markTarget, modelCache, PARK_ANGLE, parkRadius, parkSpeed, parkYaw, pickupPatience, popScore, quotaFor, setSeeds, shiftTime, shuffle, tipMul, toast, ui, worldToScreen } from './core.js';
+import { applyModeHud, audio, coach, colorHex, comboMul, confetti, formatTime, freeGuesses, markAllSlots, markTarget, modelCache, PARK_ANGLE, parkRadius, parkSpeed, pickupPatience, popScore, quotaFor, shiftTime, shuffle, tipMul, toast, ui, worldToScreen } from './core.js';
 import { angleToBay, drive, hornTick, stepExit, stepSnap } from './driving.js';
 import { cancelPeek } from './input.js';
 import { deltaLine, levelBlock, showCard, showTitle } from './menus.js';
@@ -9,7 +9,8 @@ import { arrivalGuest, valetHop } from './people.js';
 import * as platform from './platform.js';
 import { addXp, persist, save } from './progress.js';
 import { applyLevelLayout } from './shifts-world.js';
-import { playerExit, rushInteract, rushParked, tryHandoff, updateRushHUD } from './shifts.js';
+import { playerExit, rushInteract, rushParked, tryHandoff } from './shifts.js';
+import { updateRushHUD } from './hud.js';
 import { cars, G, keys, perks, resetPerks, rush, slots, tut, tutorial } from './state.js';
 
 // All tips go through here so the tip jar can track milestones.
@@ -75,7 +76,7 @@ export function parkCar() {
   const spd = Math.abs(car.speed);
   if (dist > R) { toast('Follow the gold light to your assigned bay.'); return; }
   if (spd > S) { toast('Ease off the throttle before you park.'); return; }
-  if (ang > PARK_ANGLE) { toast(parkYaw() === 0 ? 'Back in: the nose must face out of the bay.' : 'Line the nose up with the bay first.'); return; }
+  if (ang > PARK_ANGLE) { toast(G.mode === 'rush' && rush.lv.park === 'reverse' ? 'Back in: the nose must face out of the bay.' : 'Line the nose up with the bay first.'); return; }
 
   // Parking quality: centred, straight and gentle earns a bigger tip.
   const q = Math.max(0, 1 - (dist / R) * 0.4 - (ang / PARK_ANGLE) * 0.4 - (spd / S) * 0.2);
@@ -150,6 +151,8 @@ export function retrieveCar(car) {
     }
     const bay = car.slot;
     car.exitLane = bay.z < 0 ? EXIT_LANE_BACK : EXIT_LANE_FRONT;
+    car.exitRoute = bay.exitRoute;
+    car.exitRouteIndex = 0;
     bay.car = null;
     car.slot = null;
     car.exit = true;
@@ -250,7 +253,6 @@ export function start() {
   tutorial.on = false;
   rush.picking = false;
   applyLevelLayout(null);
-  setSeeds(false);
   applyModeHud();
   G.score = 0; G.streak = 0; G.sequence = 0; G.shift = 1; G.lives = MAX_LIVES; G.jarLevel = 0;
   resetPerks();

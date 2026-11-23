@@ -1,25 +1,21 @@
-// Shifts support: level layout (closed bays, cones, luggage cart, rain), power-up and bonus tokens, random events, honk and near-miss, the boon picker.
+// Shifts support: level layout (closed bays and cones), power-up and bonus tokens, random events, honk and near-miss, the boon picker.
 import * as THREE from 'three';
-import { duelGoals, HORNS, levelMods, PARKED_HALF, POWERUPS, reduceMotion, RUSH_PERKS, TOKEN_SPOTS } from './config.js';
+import { CAR_BODY_OFFSETS, CAR_BODY_RADIUS } from './collision.js';
+import { duelGoals, HORNS, levelMods, PARKED_HALF, PARKING_LAYOUTS, PARKING_TYPES, POWERUPS, reduceMotion, RUSH_PERKS, SLOT_LAYOUTS, TOKEN_SPOTS } from './config.js';
 import { audio, parkRadius, popScore, scene, shuffle, toast, worldToScreen } from './core.js';
 import { cancelPeek } from './input.js';
-import { dropoff, guide, handoff } from './people.js';
+import { dropoff, guide, handoff, otherPeople } from './people.js';
 import * as platform from './platform.js';
 import { equippedItem } from './progress.js';
-import { addTime, G, hooks, keys, rush, slots } from './state.js';
+import { addTime, cars, G, hooks, keys, rush, slots } from './state.js';
 import { applyVenue, updateVenue, venueName } from './venues.js';
 import { mat } from './world.js';
 
-// A short random event: a shower, a wedding party or a VIP convoy.
+// A short random event: a wedding party or a VIP convoy.
 export function fireEvent() {
   const opts = ['wedding', 'convoy'];
-  if (rush.lv.grip >= 1) opts.push('shower');
-  const e = opts[Math.floor(G.rngMisc() * opts.length)];
-  if (e === 'shower') {
-    rush.shower = 14;
-    document.body.dataset.weather = 'rain';
-    toast('🌧️ A sudden shower! The tarmac is slippery for 14s.');
-  } else if (e === 'wedding') {
+  const e = opts[Math.floor(Math.random() * opts.length)];
+  if (e === 'wedding') {
     rush.wedding = 15;
     toast('💒 Wedding party! All tips +30% for 15s.');
   } else {
@@ -34,11 +30,6 @@ export function honk() {
   if (!G.running || G.paused || rush.picking || G.mode !== 'rush' || !G.activeCar || rush.hornCd > 0) return;
   rush.hornCd = 0.7;
   audio.play('honk', 0, equippedItem('horn', HORNS).id);
-  if (cart && Math.hypot(cart.x - G.activeCar.x, cart.z - G.activeCar.z) < 5.5) {
-    cart.pause = 1.8;
-    const s = worldToScreen(cart.x, cart.z, 1.5);
-    popScore('Beep! The cart stops', s.x, s.y, '#6cc8ff');
-  }
   // ...and a honk also startles the rival if he is running nearby.
   const rv = rush.rival;
   if (rv && rv.state === 'walk' && rv.stun <= 0 && Math.hypot(rv.x - G.activeCar.x, rv.z - G.activeCar.z) < 6) {
@@ -48,14 +39,14 @@ export function honk() {
   }
 }
 
-// Squeezing past a cone or the luggage cart with a hair to spare slows time for a moment.
+// Squeezing past a cone with a hair to spare slows time for a moment.
 export function nearMiss(car) {
   if (G.nearCd > 0 || car.speed < 2.4 || car.delivering) return;
   const fx = Math.sin(car.yaw), fz = Math.cos(car.yaw);
   for (const c of G.colliders) {
     if (!c.lv) continue;
-    for (const off of [0.75, -0.75]) {
-      const gap = Math.hypot(car.x + fx * off - c.x, car.z + fz * off - c.z) - (0.85 + c.r);
+    for (const off of CAR_BODY_OFFSETS) {
+      const gap = Math.hypot(car.x + fx * off - c.x, car.z + fz * off - c.z) - (CAR_BODY_RADIUS + c.r);
       if (gap > 0.02 && gap < 0.22) {
         G.nearCd = 5;
         G.slowT = reduceMotion ? 0 : 0.55;
@@ -128,9 +119,16 @@ export function tokenTexture(emoji, color) {
 
 export function spawnToken() {
   const types = Object.keys(POWERUPS);
-  const type = types[Math.floor(G.rngTok() * types.length)];
-  const spots = TOKEN_SPOTS.filter((p) => !G.activeCar || Math.hypot(p[0] - G.activeCar.x, p[1] - G.activeCar.z) > 4);
-  const [x, z] = spots[Math.floor(G.rngTok() * spots.length)];
+  const type = types[Math.floor(Math.random() * types.length)];
+  const pilotSpots = rush.lv.id === 3
+    ? [[-12, 0], [-7, 0], [7, 0], [12, 0], [0, 3.8], [0, -3.8], [-12, 6], [12, 6]]
+    : rush.lv.id === 5
+      ? [[0, -5.8], [0, -2.2], [0, 1.2], [0, 5.2], [-12, -1], [12, -1], [-12, 5.8], [12, 5.8]]
+      : rush.lv.id === 6
+        ? [[-11, 0], [-5, 0], [0, 0], [5, 0], [11, 0], [-12, -4], [12, 4], [0, 7]]
+        : TOKEN_SPOTS;
+  const spots = pilotSpots.filter((p) => !G.activeCar || Math.hypot(p[0] - G.activeCar.x, p[1] - G.activeCar.z) > 4);
+  const [x, z] = spots[Math.floor(Math.random() * spots.length)];
   const def = POWERUPS[type];
   const group = new THREE.Group();
   group.position.set(x, 0, z);
@@ -163,7 +161,7 @@ export function clearToken() {
   rush.token = null;
 }
 
-export const tokenDelay = (lo, span) => (lo + G.rngTok() * span) * (1 - 0.25 * rush.perks.magnet);
+export const tokenDelay = (lo, span) => (lo + Math.random() * span) * (1 - 0.25 * rush.perks.magnet);
 
 export function collectToken() {
   const t = rush.token;
@@ -205,8 +203,8 @@ function applyRushPerk(p) {
 // The clock does not run until you pick or press Start.
 export function offerShiftIntro(onDone) {
   const lv = rush.lv;
-  const withBoons = lv.id >= 2 || rush.daily;
-  const picks = withBoons ? shuffle(RUSH_PERKS, G.rngMisc).slice(0, 3) : [];
+  const withBoons = lv.id >= 2;
+  const picks = withBoons ? shuffle(RUSH_PERKS).slice(0, 3) : [];
   rush.picking = true;
   keys.clear();
   cancelPeek();
@@ -218,7 +216,7 @@ export function offerShiftIntro(onDone) {
   perkEl.className = 'overlay';
   perkEl.setAttribute('role', 'dialog');
   perkEl.setAttribute('aria-label', `Shift ${lv.id}: ${lv.name}`);
-  perkEl.innerHTML = `<div class="hero"><div class="hero-eyebrow">${rush.daily ? 'DAILY RUN' : 'SHIFT ' + lv.id} · ${lv.secs} SECONDS · 📍 ${venueName(lv.id).toUpperCase()}</div>
+  perkEl.innerHTML = `<div class="hero"><div class="hero-eyebrow">SHIFT ${lv.id} · ${lv.secs} SECONDS · 📍 ${venueName(lv.id).toUpperCase()}</div>
     <h1 style="font-size:clamp(34px,6vw,50px)">${lv.name}</h1>
     <p>${lv.tagline}</p>
     ${mods ? `<div class="mods" style="justify-content:center;margin-top:10px">${mods}</div>` : ''}
@@ -243,7 +241,8 @@ export function offerShiftIntro(onDone) {
   const sb = perkEl.querySelector('#startShift');
   if (sb) sb.addEventListener('click', () => { audio.ensure(); go(null); });
   perkKeyHandler = (e) => {
-    if (withBoons && e.key >= '1' && e.key <= '3' && picks[+e.key - 1]) { e.preventDefault(); go(picks[+e.key - 1]); }
+    const digit = /^(Digit|Numpad)([1-3])$/.exec(e.code) ? +e.code.slice(-1) : (e.key >= '1' && e.key <= '3' ? +e.key : 0);   // by position: AZERTY's top row types symbols
+    if (withBoons && digit && picks[digit - 1]) { e.preventDefault(); go(picks[digit - 1]); }
     else if (!withBoons && e.key === 'Enter') { e.preventDefault(); go(null); }
   };
   window.addEventListener('keydown', perkKeyHandler);
@@ -251,8 +250,8 @@ export function offerShiftIntro(onDone) {
   if (first) first.focus({ preventScroll: true });
 }
 
-/* ---------- shift layout: closed bays, cones, the luggage cart, rain ---------- */
-let levelProps = null, cart = null;
+/* ---------- shift layout: closed bays and cones ---------- */
+let levelProps = null;
 
 // Orange-and-white hazard stripes with CLOSED on top of a closed bay's barrier block.
 function closedTexture() {
@@ -287,38 +286,128 @@ function clearLevelProps() {
     });
     levelProps = null;
   }
-  cart = null;
-  slots.forEach((s) => { s.closed = false; });
-  document.body.dataset.weather = '';
+  slots.forEach((s) => {
+    s.closed = false;
+    s.exitRoute = undefined;
+    s.layoutYaw = undefined;
+    if (s.baseX !== undefined) { s.x = s.baseX; s.z = s.baseZ; s.yaw = s.baseYaw; }
+    if (s.group) { s.group.position.set(s.x, 0, s.z); s.group.rotation.y = s.yaw || 0; }
+  });
 }
 
 export function applyLevelLayout(lv) {
   clearLevelProps();
   applyVenue(lv ? lv.id : 1);   // every shift is set in its own venue (null = the Nocturne Hotel)
   if (!lv) return;
+  const pilotLayout = SLOT_LAYOUTS[lv.id];
+  const offsets = PARKING_LAYOUTS[lv.id] || PARKING_LAYOUTS[1];
+  const parkingType = PARKING_TYPES[lv.id] || '90';
+  const oblique = parkingType.includes('60');
+  slots.forEach((s, i) => {
+    if (s.baseX === undefined) { s.baseX = s.x; s.baseZ = s.z; s.baseYaw = s.yaw; }
+    if (pilotLayout) {
+      s.x = pilotLayout[i].x;
+      s.z = pilotLayout[i].z;
+      s.yaw = pilotLayout[i].yaw;
+      s.layoutYaw = pilotLayout[i].yaw;
+    } else {
+      s.x = s.baseX + offsets[i][0];
+      s.z = s.baseZ + offsets[i][1];
+      s.layoutYaw = undefined;
+    }
+    if (!pilotLayout && oblique) {
+      const inward = s.baseZ < 0 ? Math.PI / 6 : Math.PI - Math.PI / 6;
+      s.yaw = (inward + (lv.park === 'reverse' ? Math.PI : 0)) % (Math.PI * 2);
+    } else if (!pilotLayout) s.yaw = lv.park === 'reverse' ? 0 : Math.PI;
+    s.exitRoute = pilotLayout ? [
+      { x: s.x - Math.sin(s.yaw) * 2.2, z: s.z - Math.cos(s.yaw) * 2.2, yaw: s.yaw },
+      { x: 11.4, z: 5.6 },
+      { x: 14.8, z: 6.2 },
+    ] : undefined;
+    if (s.group) { s.group.position.set(s.x, 0, s.z); s.group.rotation.y = s.yaw; }
+  });
   levelProps = new THREE.Group();
   scene.add(levelProps);
 
   slots.forEach((s, i) => {
     if (lv.bays.includes(i)) return;
     s.closed = true;                       // behaves like a parked car: solid, never assigned to a guest
-    const hatch = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 4.3),
+    const hatch = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 4.3),
       new THREE.MeshBasicMaterial({ color: 0xff4d4d, transparent: true, opacity: 0.13, depthWrite: false }));
     hatch.rotation.x = -Math.PI / 2;
+    hatch.rotation.y = s.yaw;
     hatch.position.set(s.x, 0.06, s.z);
     levelProps.add(hatch);
     // A visible barrier exactly where the solid collision is, so a closed bay never feels like an invisible wall.
     const blk = new THREE.Mesh(new THREE.BoxGeometry(PARKED_HALF.x * 2, 0.42, PARKED_HALF.z * 2), mat(0x2a2f33, 0.7));
     blk.position.set(s.x, 0.21, s.z);
+    blk.rotation.y = s.yaw;
     blk.castShadow = true;
     blk.receiveShadow = true;
     levelProps.add(blk);
     const top = new THREE.Mesh(new THREE.PlaneGeometry(PARKED_HALF.x * 2 - 0.1, PARKED_HALF.z * 2 - 0.1),
       new THREE.MeshBasicMaterial({ map: closedTexture(), toneMapped: false }));
     top.rotation.x = -Math.PI / 2;
+    top.rotation.y = s.yaw;
     top.position.set(s.x, 0.435, s.z);
     levelProps.add(top);
   });
+
+  if (lv.id === 3) {
+    const fountain = new THREE.Group();
+    fountain.position.set(0, 0, 0.2);
+    levelProps.add(fountain);
+    const rim = new THREE.Mesh(new THREE.CylinderGeometry(2.1, 2.35, 0.32, 24), mat(0x756c85, 0.35, 0.35));
+    rim.position.y = 0.16;
+    rim.castShadow = true;
+    fountain.add(rim);
+    const water = new THREE.Mesh(new THREE.CylinderGeometry(1.72, 1.72, 0.08, 24), mat(0x38e8ff, 0.12, 0.25, { emissive: 0x15727a, emissiveIntensity: 0.8 }));
+    water.position.y = 0.34;
+    fountain.add(water);
+    const jet = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.25, 1.8, 12), mat(0xff78cf, 0.2, 0.2, { emissive: 0x8c2a76, emissiveIntensity: 0.7 }));
+    jet.position.y = 1.15;
+    jet.castShadow = true;
+    fountain.add(jet);
+  }
+
+  if (lv.id === 5) {
+    const carpet = new THREE.Mesh(new THREE.PlaneGeometry(5.2, 12.8),
+      new THREE.MeshStandardMaterial({ color: 0x8f1f2f, roughness: 0.78 }));
+    carpet.rotation.x = -Math.PI / 2;
+    carpet.position.set(0, 0.07, 0);
+    carpet.receiveShadow = true;
+    levelProps.add(carpet);
+  }
+
+  if (lv.id === 6) {
+    for (const z of [-5.2, 5.8]) {
+      const curb = new THREE.Mesh(new THREE.BoxGeometry(24.5, 0.22, 0.34), mat(0xd7d8d2, 0.7));
+      curb.position.set(0, 0.11, z);
+      curb.castShadow = true;
+      levelProps.add(curb);
+    }
+  }
+
+  if (parkingType.includes('island')) {
+    const island = new THREE.Group();
+    island.position.set(0, 0, -1.72);
+    levelProps.add(island);
+    const stone = new THREE.Mesh(new THREE.BoxGeometry(2.25, 0.32, 0.9), mat(0x565c53, 0.85));
+    stone.position.y = 0.16;
+    stone.castShadow = true;
+    island.add(stone);
+    const soil = new THREE.Mesh(new THREE.BoxGeometry(2.05, 0.16, 0.72), mat(0x473e2d, 1));
+    soil.position.y = 0.38;
+    island.add(soil);
+    for (const [x, z, scale] of [[-0.62, 0, 0.72], [0, -0.08, 0.92], [0.62, 0.03, 0.76]]) {
+      const bush = new THREE.Mesh(new THREE.DodecahedronGeometry(0.46 * scale, 0), mat(0x376345, 0.9));
+      bush.position.set(x, 0.52 + 0.2 * scale, z);
+      bush.scale.set(1.1, 0.8, 0.9);
+      bush.castShadow = true;
+      island.add(bush);
+    }
+    // median is visual only: a collider here blocked the aisle and exit lane
+  }
 
   for (const [x, z] of lv.cones) {
     const cone = new THREE.Mesh(new THREE.ConeGeometry(0.4, 1.0, 12), mat(0xff7a1a, 0.5));
@@ -331,41 +420,14 @@ export function applyLevelLayout(lv) {
     const band = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.27, 0.18, 12), mat(0xf4f4ee, 0.5));
     band.position.set(x, 0.55, z);
     levelProps.add(band);
-    G.colliders.push({ x, z, r: 0.45, lv: true });
+    G.colliders.push({ x, z, r: 0.5, lv: true, kind: 'cone' });
   }
 
-  if (lv.cart) {
-    const g = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.18, 0.95), mat(0xd6b674, 0.3, 0.7));
-    body.position.y = 0.45;
-    g.add(body);
-    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.5, 0.06), mat(0xd6b674, 0.3, 0.7));
-    rail.position.set(-0.8, 0.9, 0);
-    g.add(rail);
-    for (const [dx, col] of [[-0.35, 0x7a1f2e], [0.3, 0x2f4a86]]) {
-      const bag = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.5, 0.7), mat(col, 0.6));
-      bag.position.set(dx, 0.8, 0);
-      bag.castShadow = true;
-      g.add(bag);
-    }
-    levelProps.add(g);
-    cart = { group: g, def: lv.cart, t: Math.PI * 0.5, x: lv.cart.x0, z: lv.cart.z, r: 0.9, lv: true };
-    G.colliders.push(cart);
-    updateLevelProps(0);
-  }
-  document.body.dataset.weather = lv.grip < 1 ? 'rain' : '';
 }
 
-// Moves the luggage cart back and forth across the lot.
+// Venue-only animation; level hazards such as cones are updated elsewhere.
 export function updateLevelProps(dt) {
   updateVenue(dt);
-  if (!cart) return;
-  if (cart.pause > 0) { cart.pause -= dt; return; }
-  cart.t += dt * cart.def.speed;
-  const u = 0.5 + 0.5 * Math.sin(cart.t);
-  cart.x = cart.def.x0 + (cart.def.x1 - cart.def.x0) * u;
-  cart.group.position.set(cart.x, 0, cart.z);
-  cart.group.rotation.y = Math.cos(cart.t) >= 0 ? Math.PI / 2 : -Math.PI / 2;
 }
 
 // Shows the PICK-UP and DROP-OFF rings while a shift is running, and hides the guide arrow otherwise.

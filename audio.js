@@ -1,11 +1,14 @@
-// WebAudio helper: reactive procedural music, sampled engine loop + horn/bump/door/coin one-shots, with the original
-// synthesised sounds kept as a fallback (used until samples load, or if a file fails to load).
+// WebAudio helper: reactive procedural music, model-specific engines, and sampled horn/bump/door/coin effects.
 // Everything routes through one master gain, so muting is a single, consistent switch.
 // Sample credits (all CC0) are in assets/sounds/CREDITS.txt.
+//
+// ENGINES: each car is rendered at startup into seamless looping buffers (low / mid / high RPM) using a
+// small combustion model (per-cylinder firing pulses -> exhaust resonances -> muffler -> saturation).
+// While driving, the three loops are crossfaded and pitched with RPM, so every car has its own firing
+// order, tone and character. No sample files are needed for engines.
 
 const SAMPLE_DIR = './assets/sounds/';
 const SAMPLE_FILES = {
-  engine: 'engine_loop.ogg',
   horn: 'horn.ogg',
   bumpHeavy: 'bump_heavy.ogg',
   bumpLight: 'bump_light.ogg',
@@ -13,16 +16,228 @@ const SAMPLE_FILES = {
   coins: 'coins.ogg',
 };
 
+// cyl/idle/redline/firing/amps: engine layout. jitter/ampJitter: cycle-to-cycle irregularity.
+// pulseMs/noise/noiseMs/tick: combustion thump, hiss/rasp and valve/injector clatter.
+// res: exhaust resonances [freqHz, ringing 0..1, gain]. lp: muffler cutoff. drive: saturation.
+// shiftSpeeds/cutoff/rise: gearbox and live brightness (as before).
+export const ENGINE_PROFILES = {
+  // Family sedan: smooth, ordinary inline-4
+  'sedan.glb': {
+    cyl: 4, idle: 800, redline: 6200, jitter: 0.15, ampJitter: 0.08,
+    pulseMs: 3.2, noise: 0.22, noiseMs: 1.6, tick: 0.08,
+    res: [[150, 0.994, 1], [330, 0.99, 0.7], [700, 0.985, 0.35]], dry: 0.5, lp: 2200, drive: 1.5,
+    shiftSpeeds: [1.05, 2.25], cutoff: 900, rise: 170,
+  },
+  // Luxury SUV: quiet, deep, muffled V6
+  'suv-luxury.glb': {
+    cyl: 6, idle: 650, redline: 5400, jitter: 0.08, ampJitter: 0.05,
+    pulseMs: 4.5, noise: 0.12, noiseMs: 2.2, tick: 0.04,
+    res: [[95, 0.996, 1], [210, 0.992, 0.8], [430, 0.985, 0.3]], dry: 0.35, lp: 1300, drive: 1.1,
+    shiftSpeeds: [0.95, 2.05], cutoff: 700, rise: 120,
+  },
+  // Sports sedan: lumpy, burbling V8 with uneven bank amplitudes
+  'sedan-sports.glb': {
+    cyl: 8, idle: 750, redline: 7200, jitter: 0.3, ampJitter: 0.12,
+    amps: [1, 0.65, 0.9, 0.6, 1, 0.65, 0.9, 0.6],
+    pulseMs: 3.8, noise: 0.3, noiseMs: 2, tick: 0.06,
+    res: [[85, 0.997, 1.2], [170, 0.994, 0.9], [380, 0.99, 0.6], [900, 0.98, 0.35]], dry: 0.45, lp: 2800, drive: 2.0,
+    shiftSpeeds: [1.2, 2.7], cutoff: 1500, rise: 240,
+  },
+  // Hot hatch: high-revving, raspy turbo four with whistle and blow-off
+  'hatchback-sports.glb': {
+    cyl: 4, idle: 900, redline: 7600, jitter: 0.1, ampJitter: 0.1,
+    pulseMs: 2.2, noise: 0.35, noiseMs: 1.2, tick: 0.15,
+    res: [[210, 0.993, 1], [480, 0.99, 0.8], [1050, 0.985, 0.6], [2200, 0.97, 0.25]], dry: 0.5, lp: 3600, drive: 2.2,
+    turbo: true,
+    shiftSpeeds: [1.1, 2.45], cutoff: 1250, rise: 210,
+  },
+  // Taxi: clattery, lumpy diesel four
+  'taxi.glb': {
+    cyl: 4, idle: 750, redline: 4800, jitter: 0.35, ampJitter: 0.2,
+    pulseMs: 2, noise: 0.9, noiseMs: 1.0, tick: 0.5,
+    res: [[130, 0.993, 1], [290, 0.99, 0.8], [600, 0.985, 0.5]], dry: 0.6, lp: 1700, drive: 1.8,
+    shiftSpeeds: [1, 2.2], cutoff: 720, rise: 140,
+  },
+};
+
+// Engine recordings live in assets/sounds/engines/. Each entry is [file, playbackRPMAnchor];
+// the anchors are tuned to the game's RPM range, not claims about the source recording RPM.
+// The six loop layers are shared and decoded once; missing files fall back to the procedural engine.
+const ENGINE_DIR = './assets/sounds/engines/';
+// These CC0 loops are six neighboring pitch steps from one engine take. Crossfading them
+// keeps the engine timbre stable across the full rev range without extreme playback-rate shifts.
+const ENGINE_LOOP_LAYERS = [
+  ['loop_0.wav', 1100], ['loop_1_0.wav', 1650], ['loop_2_0.wav', 2250],
+  ['loop_3_0.wav', 3100], ['loop_4_0.wav', 4100], ['loop_5_0.wav', 5400],
+];
+// Keep vehicle differences restrained; large pitch offsets make a car sound like a different machine.
+const CAR_PITCH = {
+  'sedan.glb': 1.0,
+  'suv-luxury.glb': 0.92,
+  'sedan-sports.glb': 1.06,
+  'hatchback-sports.glb': 1.08,
+  'taxi.glb': 0.9,
+};
+export const ENGINE_SAMPLES = Object.fromEntries(
+  Object.keys(ENGINE_PROFILES).map((k) => [k, ENGINE_LOOP_LAYERS.map(([file, rpm]) => [file, rpm / (CAR_PITCH[k] ?? 1)])]),
+);
+
+export function gearForSpeed(speed, shiftSpeeds, currentGear = 0, hysteresis = 0.18) {
+  let gear = Math.max(0, Math.min(shiftSpeeds.length, currentGear));
+  while (gear < shiftSpeeds.length && speed >= shiftSpeeds[gear]) gear++;
+  while (gear > 0 && speed < shiftSpeeds[gear - 1] - hysteresis) gear--;
+  return gear;
+}
+
+// Legacy helper kept for compatibility (returned an oscillator frequency, not real RPM).
+export function engineRpm(speed, profile, gear) {
+  const gearStart = gear > 0 ? profile.shiftSpeeds[gear - 1] : 0;
+  const gearEnd = profile.shiftSpeeds[gear] ?? 5.6;
+  const gearProgress = Math.max(0, Math.min(1, (Math.min(speed, 5.6) - gearStart) / (gearEnd - gearStart)));
+  return (profile.base ?? 70) + gear * (profile.gearStep ?? 55) + gearProgress * (profile.rev ?? 108);
+}
+
+// Real engine RPM for a speed/gear: climbs through each gear and drops back after each upshift.
+export function engineRevs(speed, profile, gear) {
+  const top = profile.redline * 0.92;
+  const start = gear > 0 ? profile.shiftSpeeds[gear - 1] : 0;
+  const end = profile.shiftSpeeds[gear] ?? 5.6;
+  const prog = Math.max(0, Math.min(1, (Math.min(speed, 5.6) - start) / (end - start)));
+  const lo = gear === 0 ? profile.idle * 1.15 : top * 0.58;
+  return lo + (top - lo) * prog;
+}
+
+/* ---------- engine loop renderer (pure JS, no WebAudio needed) ---------- */
+const RENDER_SR = 32000;
+const LAYER_BRIGHT = [0.75, 1, 1.3];
+
+function rng(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function resonate(x, f, r, sr) {
+  const len = x.length;
+  const a1 = 2 * r * Math.cos(2 * Math.PI * f / sr), a2 = -r * r, g = 1 - r;
+  const out = new Float32Array(len);
+  let y1 = 0, y2 = 0;
+  for (let n = 0; n < len * 2; n++) {      // two passes so the loop is seamless
+    const i = n % len;
+    const y = g * x[i] + a1 * y1 + a2 * y2;
+    y2 = y1; y1 = y;
+    if (n >= len) out[i] = y;
+  }
+  return out;
+}
+
+function onePoleLow(x, fc, sr) {
+  const len = x.length, a = 1 - Math.exp(-2 * Math.PI * fc / sr);
+  const out = new Float32Array(len);
+  let y = 0;
+  for (let n = 0; n < len * 2; n++) {
+    const i = n % len;
+    y += a * (x[i] - y);
+    if (n >= len) out[i] = y;
+  }
+  return out;
+}
+
+// Renders ~1 s of seamlessly looping engine at `rpm` for profile `p`.
+export function renderEngineLoop(p, rpm, bright = 1, seed = 1, sr = RENDER_SR) {
+  const cycleSec = 120 / rpm;                                   // one 4-stroke cycle = 720 deg
+  const cycles = Math.max(2, Math.round(1.1 / cycleSec));
+  const len = Math.round(cycleSec * cycles * sr);
+  const x = new Float32Array(len);
+  const rand = rng(seed);
+  const firing = p.firing || Array.from({ length: p.cyl }, (_, k) => k / p.cyl);
+  const pulseN = Math.max(8, Math.round(sr * p.pulseMs / 1000));
+  const noiseN = Math.max(4, Math.round(sr * p.noiseMs / 1000));
+  const tickOff = Math.round(sr * 0.004);
+
+  for (let c = 0; c < cycles; c++) {
+    for (let k = 0; k < p.cyl; k++) {
+      const jit = (rand() - 0.5) * p.jitter / p.cyl;
+      const i0 = Math.floor(((c + firing[k] + jit) / cycles) * len);
+      const amp = (p.amps ? p.amps[k % p.amps.length] : 1) * (1 + (rand() - 0.5) * p.ampJitter);
+      for (let n = 0; n < pulseN; n++) {                         // combustion thump
+        const s = Math.sin(Math.PI * n / pulseN);
+        x[(i0 + n) % len] += amp * s * s;
+      }
+      for (let n = 0; n < noiseN * 5; n++) {                     // exhaust hiss / diesel rasp
+        x[(i0 + n) % len] += amp * p.noise * (rand() * 2 - 1) * Math.exp(-n / noiseN);
+      }
+      const j = (i0 + tickOff) % len;                            // valve / injector tick
+      const sign = rand() > 0.5 ? 1 : -1;
+      x[j] += amp * p.tick * sign;
+      x[(j + 1) % len] -= amp * p.tick * sign;
+    }
+  }
+
+  const mix = new Float32Array(len);
+  for (let i = 0; i < len; i++) mix[i] = x[i] * p.dry;
+  for (const [f, r, g] of p.res) {
+    const y = resonate(x, f, r, sr);
+    for (let i = 0; i < len; i++) mix[i] += y[i] * g * 6;
+  }
+  let y = onePoleLow(mix, p.lp * bright, sr);
+  y = onePoleLow(y, p.lp * bright * 1.6, sr);
+  const dc = onePoleLow(y, 35, sr);                              // remove DC / sub-rumble
+  let peak = 0;
+  for (let i = 0; i < len; i++) {
+    y[i] = Math.tanh((y[i] - dc[i]) * p.drive);
+    peak = Math.max(peak, Math.abs(y[i]));
+  }
+  const norm = peak > 0 ? 0.8 / peak : 1;
+  for (let i = 0; i < len; i++) y[i] *= norm;
+  return y;
+}
+
+function layerRpms(p) {
+  return [p.idle * 1.15, p.idle + (p.redline - p.idle) * 0.42, p.redline * 0.82];
+}
+
+// Equal-power crossfade between any number of loops, whose rpms must be ascending.
+function layerWeights(rpm, rpms) {
+  const n = rpms.length;
+  const w = new Array(n).fill(0);
+  if (rpm <= rpms[0]) w[0] = 1;
+  else if (rpm >= rpms[n - 1]) w[n - 1] = 1;
+  else {
+    let i = 0;
+    while (rpm > rpms[i + 1]) i++;
+    const f = (rpm - rpms[i]) / (rpms[i + 1] - rpms[i]);
+    w[i] = Math.cos(f * Math.PI / 2);
+    w[i + 1] = Math.sin(f * Math.PI / 2);
+  }
+  return w;
+}
+
 export function createAudio(initiallyOn = true) {
   let ctx = null;
   let master = null;
-  let engineOsc = null;
-  let oscGain = null;      // synth engine level (muted once the sampled engine is ready)
+  let engineFilter = null;
   let engineGain = null;   // shared output level for whichever engine is active
-  let engineSrc = null;    // looping sample source
+  let engineShiftGain = null;
+  let roadGain = null;
+  let turboOsc = null;
+  let turboGain = null;
   let on = initiallyOn;
   const buffers = {};
+  const realEngines = {};  // model -> [{ buf, rpm }] decoded from ENGINE_SAMPLES
   let loading = false;
+  let engineModel = null;
+  let engineGear = 0;
+  let lastEngineSpeed = 0;
+  let lastEngineTime = 0;
+  let load = 0.4;
+  let active = null;       // currently sounding engine voice
+  const voices = {};       // rendered loop buffers per model
 
   async function loadSamples() {
     if (loading || !ctx) return;
@@ -35,17 +250,95 @@ export function createAudio(initiallyOn = true) {
         buffers[key] = await ctx.decodeAudioData(data);
       } catch (e) { /* keep the synth fallback for this sound */ }
     }));
-    if (buffers.engine) startEngineSample();
+    // Load the recorded engine layers; any car that loads at least one replaces its synth fallback.
+    const fetched = {};   // one download/decode per distinct file, shared by every car that uses it
+    const fetchEngine = (file) => (fetched[file] ??= (async () => {
+      const names = /\.\w+$/.test(file) ? [file] : ['.wav', '.ogg', '.mp3', '.flac'].map((e) => file + e);
+      for (const name of names) {
+        try {
+          const res = await fetch(ENGINE_DIR + name);
+          if (!res.ok) continue;
+          return await ctx.decodeAudioData(await res.arrayBuffer());
+        } catch (e) { /* try the next extension */ }
+      }
+      return null;
+    })());
+    await Promise.all(Object.entries(ENGINE_SAMPLES).map(async ([model, list]) => {
+      const loaded = [];
+      for (const [file, rpm] of list) {
+        const buf = await fetchEngine(file);
+        if (buf) {
+          let peak = 0;   // recordings are often quiet: normalize so every source plays at a similar level
+          for (let c = 0; c < buf.numberOfChannels; c++) {
+            const d = buf.getChannelData(c);
+            for (let i = 0; i < d.length; i++) peak = Math.max(peak, Math.abs(d[i]));
+          }
+          loaded.push({ buf, rpm, norm: peak > 0 ? Math.min(8, 0.8 / peak) : 1 });
+        }
+      }
+      if (loaded.length) {
+        loaded.sort((a, b) => a.rpm - b.rpm);
+        realEngines[model] = loaded;
+        delete voices[model];
+        if (engineModel === model) engineModel = null;   // re-pick the voice on the next engine() call
+      }
+    }));
   }
 
-  function startEngineSample() {
-    engineSrc = ctx.createBufferSource();
-    engineSrc.buffer = buffers.engine;
-    engineSrc.loop = true;
-    engineSrc.playbackRate.value = 0.8;
-    engineSrc.connect(engineGain);
-    engineSrc.start();
-    oscGain.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
+  function getVoice(key) {
+    if (voices[key]) return voices[key];
+    if (realEngines[key]) {
+      return (voices[key] = {
+        bufs: realEngines[key].map((e) => e.buf),
+        rpms: realEngines[key].map((e) => e.rpm),
+        norms: realEngines[key].map((e) => e.norm),
+      });
+    }
+    const p = ENGINE_PROFILES[key];
+    const rpms = layerRpms(p);
+    const seed = 1000 + Object.keys(ENGINE_PROFILES).indexOf(key) * 97;
+    const bufs = rpms.map((r, i) => {
+      const data = renderEngineLoop(p, r, LAYER_BRIGHT[i], seed + i);
+      const b = ctx.createBuffer(1, data.length, RENDER_SR);
+      b.copyToChannel(data, 0);
+      return b;
+    });
+    return (voices[key] = { bufs, rpms, norms: bufs.map(() => 1) });
+  }
+
+  function prefetchVoices() {
+    const keys = Object.keys(ENGINE_PROFILES);
+    let i = 0;
+    const next = () => { if (i < keys.length) { getVoice(keys[i++]); setTimeout(next, 120); } };
+    setTimeout(next, 300);
+  }
+
+  function activate(key) {
+    const v = getVoice(key);
+    const out = ctx.createGain();
+    out.gain.value = 0;
+    out.connect(engineFilter);
+    const layers = v.bufs.map((buf) => {
+      const s = ctx.createBufferSource();
+      const g = ctx.createGain();
+      s.buffer = buf;
+      s.loop = true;
+      g.gain.value = 0;
+      s.connect(g).connect(out);
+      s.start(0, Math.random() * buf.duration);
+      return { s, g };
+    });
+    out.gain.setTargetAtTime(1, ctx.currentTime, 0.05);
+    return { out, layers, rpms: v.rpms, norms: v.norms };
+  }
+
+  function deactivate(a) {
+    if (!a) return;
+    a.out.gain.setTargetAtTime(0, ctx.currentTime, 0.04);
+    setTimeout(() => {
+      a.layers.forEach((l) => { try { l.s.stop(); } catch (e) { /* already stopped */ } });
+      a.out.disconnect();
+    }, 500);
   }
 
   function ensure() {
@@ -57,28 +350,46 @@ export function createAudio(initiallyOn = true) {
       master.gain.value = on ? 1 : 0;
       master.connect(ctx.destination);
 
-      engineOsc = ctx.createOscillator();
-      engineOsc.type = 'sawtooth';
-      engineOsc.frequency.value = 56;
-      oscGain = ctx.createGain();
-      oscGain.gain.value = 1;
+      // engine chain: voice -> filter -> level -> shift cut -> master
+      engineFilter = ctx.createBiquadFilter();
+      engineFilter.type = 'lowpass';
+      engineFilter.Q.value = 0.7;
+      engineFilter.frequency.value = 2000;
       engineGain = ctx.createGain();
       engineGain.gain.value = 0;
-      const lowpass = ctx.createBiquadFilter();
-      lowpass.type = 'lowpass';
-      lowpass.frequency.value = 180;
-      engineOsc.connect(lowpass).connect(oscGain).connect(engineGain).connect(master);
-      engineOsc.start();
+      engineShiftGain = ctx.createGain();
+      engineShiftGain.gain.value = 1;
+      engineFilter.connect(engineGain).connect(engineShiftGain).connect(master);
 
-      const drone = ctx.createOscillator();
-      const droneGain = ctx.createGain();
-      drone.type = 'sine';
-      drone.frequency.value = 110;
-      droneGain.gain.value = 0.012;
-      drone.connect(droneGain).connect(master);
-      drone.start();
+      // road / tyre noise, scales with speed
+      const nLen = ctx.sampleRate * 2;
+      const nBuf = ctx.createBuffer(1, nLen, ctx.sampleRate);
+      const nd = nBuf.getChannelData(0);
+      let b = 0;
+      for (let i = 0; i < nLen; i++) { b = b * 0.97 + (Math.random() * 2 - 1) * 0.3; nd[i] = b; }
+      const nSrc = ctx.createBufferSource();
+      nSrc.buffer = nBuf;
+      nSrc.loop = true;
+      const nFilter = ctx.createBiquadFilter();
+      nFilter.type = 'bandpass';
+      nFilter.frequency.value = 350;
+      nFilter.Q.value = 0.6;
+      roadGain = ctx.createGain();
+      roadGain.gain.value = 0;
+      nSrc.connect(nFilter).connect(roadGain).connect(master);
+      nSrc.start();
+
+      // turbo whistle (only audible on turbo cars)
+      turboOsc = ctx.createOscillator();
+      turboOsc.type = 'sine';
+      turboOsc.frequency.value = 2000;
+      turboGain = ctx.createGain();
+      turboGain.gain.value = 0;
+      turboOsc.connect(turboGain).connect(master);
+      turboOsc.start();
 
       loadSamples();
+      prefetchVoices();
     }
     if (ctx.state === 'suspended') ctx.resume();
   }
@@ -110,6 +421,29 @@ export function createAudio(initiallyOn = true) {
     src.connect(g).connect(master);
     src.start(ctx.currentTime + delay);
     return true;
+  }
+
+  // Turbo blow-off: short filtered-noise "pssh" on upshift
+  function blowOff() {
+    if (!ctx || !on) return;
+    const t = ctx.currentTime;
+    const len = Math.floor(ctx.sampleRate * 0.4);
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    const src = ctx.createBufferSource();
+    const f = ctx.createBiquadFilter();
+    const g = ctx.createGain();
+    src.buffer = buf;
+    f.type = 'bandpass';
+    f.frequency.setValueAtTime(4200, t);
+    f.frequency.exponentialRampToValueAtTime(2200, t + 0.35);
+    f.Q.value = 0.8;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.09, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+    src.connect(f).connect(g).connect(master);
+    src.start(t);
   }
 
   const jitter = (base, amt = 0.08) => base * (1 + (Math.random() - 0.5) * 2 * amt);
@@ -243,22 +577,69 @@ export function createAudio(initiallyOn = true) {
       if (p) ctx.suspend();
       else ctx.resume();
     },
-    // Pass the car's speed while driving, or null to silence the engine.
-    engine(speed) {
+    // Pass the car's speed and model while driving, or null to silence the engine.
+    engine(speed, model) {
       if (!ctx || !engineGain) return;
       const t = ctx.currentTime;
       if (speed == null) {
         engineGain.gain.setTargetAtTime(0, t, 0.1);
+        roadGain.gain.setTargetAtTime(0, t, 0.1);
+        turboGain.gain.setTargetAtTime(0, t, 0.05);
+        engineShiftGain.gain.setTargetAtTime(1, t, 0.05);
+        lastEngineSpeed = 0;
+        engineGear = 0;
+        load = 0.4;
         return;
       }
-      if (engineSrc) {
-        // Idle burble that revs up with speed (speed tops out around 5.6).
-        engineGain.gain.setTargetAtTime(0.12 + Math.min(0.3, speed * 0.07), t, 0.12);
-        engineSrc.playbackRate.setTargetAtTime(0.8 + speed * 0.4, t, 0.15);
-      } else {
-        engineGain.gain.setTargetAtTime(0.018 + Math.min(0.035, speed * 0.00018), t, 0.12);
-        engineOsc.frequency.setTargetAtTime(48 + speed * 0.5, t, 0.15);
+      const key = ENGINE_PROFILES[model] ? model : 'taxi.glb';
+      const profile = ENGINE_PROFILES[key];
+      if (engineModel !== key) {
+        deactivate(active);
+        active = activate(key);
+        engineModel = key;
+        engineGear = 0;
       }
+
+      // throttle load from acceleration: pushing = loud/bright, coasting = quieter/duller
+      const dt = t - lastEngineTime;
+      if (dt > 0.005 && dt < 0.5) {
+        const accel = (speed - lastEngineSpeed) / dt;
+        const target = Math.max(0.25, Math.min(1, 0.45 + accel * 2.5));
+        load += (target - load) * Math.min(1, dt * 6);
+      }
+      lastEngineTime = t;
+
+      const nextGear = gearForSpeed(speed, profile.shiftSpeeds, engineGear);
+      const upshift = nextGear > engineGear;
+      engineGear = nextGear;
+      const rpm = engineRevs(speed, profile, engineGear);
+
+      if (upshift) {                                    // brief torque cut on each shift
+        engineShiftGain.gain.cancelScheduledValues(t);
+        engineShiftGain.gain.setValueAtTime(1, t);
+        engineShiftGain.gain.linearRampToValueAtTime(0.35, t + 0.03);
+        engineShiftGain.gain.linearRampToValueAtTime(1, t + 0.2);
+        if (profile.turbo) blowOff();
+      }
+
+      const w = layerWeights(rpm, active.rpms);
+      active.layers.forEach((l, i) => {
+        const rate = rpm / active.rpms[i];
+        l.s.playbackRate.setTargetAtTime(Math.max(0.4, Math.min(2.5, rate)), t, upshift ? 0.02 : 0.06);
+        l.g.gain.setTargetAtTime(w[i] * active.norms[i], t, 0.05);
+      });
+
+      const norm = Math.max(0, Math.min(1, (rpm - profile.idle) / (profile.redline - profile.idle)));
+      engineGain.gain.setTargetAtTime((0.2 + norm * 0.2) * (0.6 + 0.4 * load), t, 0.08);
+      engineFilter.frequency.setTargetAtTime((profile.cutoff + speed * profile.rise) * 2 * (0.55 + 0.45 * load), t, 0.12);
+      roadGain.gain.setTargetAtTime(Math.pow(Math.min(speed / 5.6, 1), 1.5) * 0.05, t, 0.15);
+      if (profile.turbo) {
+        turboOsc.frequency.setTargetAtTime(1800 + norm * 4200, t, 0.1);
+        turboGain.gain.setTargetAtTime(0.012 * load * norm * norm, t, 0.12);
+      } else {
+        turboGain.gain.setTargetAtTime(0, t, 0.05);
+      }
+      lastEngineSpeed = speed;
     },
     play(kind, n = 0, style = 'classic') {
       switch (kind) {

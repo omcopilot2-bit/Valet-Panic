@@ -1,10 +1,7 @@
 // Static scene: lighting, forecourt, hotel, bays, props, and the circle colliders for props.
 import * as THREE from 'three';
 
-export const SLOT_POSITIONS = [
-  [-9.1, -4.55], [-3.05, -4.55], [3.05, -4.55], [9.1, -4.55],
-  [-9.1, 1.12], [-3.05, 1.12], [3.05, 1.12], [9.1, 1.12],
-];
+export { SLOT_POSITIONS } from './config.js';   // plain data lives in config.js so tests can load it without a DOM
 
 /* ---------- small helpers ---------- */
 export function mat(color, roughness = 0.7, metalness = 0, extra = {}) {
@@ -45,23 +42,32 @@ export function addTextTexture(lines, options = {}) {
   can.width = w;
   can.height = h;
   const c = can.getContext('2d');
-  c.fillStyle = options.bg || '#10201d';
-  c.fillRect(0, 0, w, h);
-  if (options.border) {
-    c.strokeStyle = options.border;
-    c.lineWidth = 4;
-    c.strokeRect(10, 10, w - 20, h - 20);
-  }
-  lines.forEach((line, i) => {
-    c.fillStyle = line.color || '#e5ca8d';
-    c.font = `${line.weight || '500'} ${line.size || 70}px ${line.font || 'Georgia'}`;
-    c.textAlign = 'center';
-    c.textBaseline = 'middle';
-    c.fillText(line.text, w / 2, line.y ?? h * (i === 0 ? 0.44 : 0.77));
-  });
+  const draw = () => {
+    c.fillStyle = options.bg || '#10201d';
+    c.fillRect(0, 0, w, h);
+    if (options.border) {
+      c.strokeStyle = options.border;
+      c.lineWidth = 4;
+      c.strokeRect(10, 10, w - 20, h - 20);
+    }
+    lines.forEach((line, i) => {
+      c.fillStyle = line.color || '#e5ca8d';
+      c.font = `${line.weight || '500'} ${line.size || 70}px ${line.font || 'Georgia'}`;
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      c.fillText(line.text, w / 2, line.y ?? h * (i === 0 ? 0.44 : 0.77));
+    });
+  };
+  draw();
   const tex = new THREE.CanvasTexture(can);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 4;
+  // Decals are drawn at import time, usually before the web font has loaded. Redraw them once it arrives.
+  if (document.fonts && lines.some((l) => l.font && l.font.includes('Fredoka'))) {
+    const spec = lines.find((l) => l.font && l.font.includes('Fredoka'));
+    const face = `${spec.weight || '500'} 40px Fredoka`;
+    if (!document.fonts.check(face)) document.fonts.load(face).then(() => { draw(); tex.needsUpdate = true; }).catch(() => {});
+  }
   return tex;
 }
 
@@ -245,7 +251,7 @@ function makeBay(scene, slot) {
   g.position.set(slot.x, 0, slot.z);
   scene.add(g);
   const line = materials.bayLine;
-  const len = 4.55, w = 4.45, th = 0.075;
+  const len = 4.55, w = 3.5, th = 0.075;
   box(g, -w / 2, 0.035, 0, th, 0.04, len, line, false);
   box(g, w / 2, 0.035, 0, th, 0.04, len, line, false);
   box(g, 0, 0.035, -len / 2, w, 0.04, th, line, false);
@@ -319,16 +325,16 @@ export function buildWorld(scene, slots) {
   for (const z of [-2.3, 4.2]) {
     for (const x of [-13.55, 13.55]) {
       makePlanter(scene, x, z, 1.6);
-      colliders.push({ x, z, r: 1.0 });
+      colliders.push({ x, z, r: 1.15, halfX: 0.8, halfZ: 0.8, kind: 'planter' });
     }
   }
 
-  // Bollards line the outer lanes (moved out of the bays so they never block parking). Also solid.
-  for (let z = -7; z <= -2; z += 1.6) {
+  // Bollards line the outer lanes, leaving the end of the cross-lane open for cars exiting the back row.
+  for (let z = -7; z <= -3.8; z += 1.6) {
     for (const x of [-12.3, 12.3]) {
       cylinder(scene, x, 0.42, z, 0.16, 0.2, 0.84, materials.trim, 16);
       cylinder(scene, x, 0.85, z, 0.22, 0.22, 0.08, materials.goldLine, 16);
-      colliders.push({ x, z, r: 0.26 });
+      colliders.push({ x, z, r: 0.26, kind: 'bollard' });
     }
   }
 
