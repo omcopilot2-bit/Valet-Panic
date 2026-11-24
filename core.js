@@ -13,7 +13,7 @@ export const canvas = document.querySelector('#game');
 
 export const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'high-performance' });
 
-renderer.setPixelRatio(Math.min(devicePixelRatio, 1.6));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 
 renderer.shadowMap.enabled = true;
 
@@ -109,7 +109,8 @@ const _wp = new THREE.Vector3();
 
 export function worldToScreen(x, z, y = 0.5) {
   const p = _wp.set(x, y, z).project(camera);
-  return { x: (p.x + 1) / 2 * innerWidth, y: (1 - p.y) / 2 * innerHeight };
+  const rect = canvas.getBoundingClientRect();
+  return { x: rect.left + (p.x + 1) / 2 * rect.width, y: rect.top + (1 - p.y) / 2 * rect.height };
 }
 
 export function shuffle(a, rng = Math.random) {

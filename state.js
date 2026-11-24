@@ -87,7 +87,7 @@ export const hooks = { rushHud: () => {} };
 export const tutorial = { on: false, step: '', dist: 0, spawned: false, doneAt: 0 };
 
 export const keys = new Set();
-export const touchInput = { walkX: 0, walkY: 0, steer: 0, gas: false, brake: false, brakeStoppedTime: 0 };
+export const touchInput = { walkX: 0, walkY: 0, steer: 0, steerTarget: 0, gas: false, brake: false, reverse: false };
 
 // How the movement keys are labelled in hints (ZQSD on a French keyboard).
 export const layout = { move: 'WASD' };

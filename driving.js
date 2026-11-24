@@ -171,10 +171,11 @@ function resolveCollisions(car) {
 
 export function drive(car, dt) {
   const forward = keys.has('ArrowUp') || keys.has('w') || touchInput.gas;
-  const back = keys.has('ArrowDown') || keys.has('s');
+  const back = keys.has('ArrowDown') || keys.has('s') || touchInput.reverse;
   const left = keys.has('ArrowLeft') || keys.has('a');
   const right = keys.has('ArrowRight') || keys.has('d');
   const digitalThrottle = (forward ? 1 : 0) - (back ? 1 : 0);
+  touchInput.steer += (touchInput.steerTarget - touchInput.steer) * Math.min(1, dt * 12);
   const steer = THREE.MathUtils.clamp((left ? 1 : 0) - (right ? 1 : 0) + touchInput.steer, -1, 1);
   const q = car.quirk;
   const fX = Math.sin(car.yaw), fZ = Math.cos(car.yaw);
@@ -184,11 +185,8 @@ export function drive(car, dt) {
   const vmax = (nitro ? 6.2 : 4.4) * (car.special === 'vintage' ? 0.8 : 1);
 
   const fw0 = car.vx * fX + car.vz * fZ;
-  if (touchInput.brake && Math.abs(fw0) <= 0.3) touchInput.brakeStoppedTime += dt;
-  else touchInput.brakeStoppedTime = 0;
-  const throttle = touchInput.brake
-    ? (Math.abs(fw0) > 0.3 ? -Math.sign(fw0) : touchInput.brakeStoppedTime > 0.35 ? -1 : 0)
-    : digitalThrottle;
+  const brakeRequested = touchInput.brake;
+  const throttle = brakeRequested ? 0 : digitalThrottle;
   const accel = throttle !== 0 && Math.sign(throttle) !== Math.sign(fw0) && Math.abs(fw0) > 0.3 ? 9 : (nitro ? 11 : 6);   // braking bites harder than accelerating
   car.vx += fX * throttle * accel * dt;
   car.vz += fZ * throttle * accel * dt;
@@ -205,6 +203,21 @@ export function drive(car, dt) {
     const k = 1 - Math.pow(q === 'brakes' ? 0.93 : 0.84 + slick * 0.15, dt * 60);
     car.vx -= lx * k;
     car.vz -= lz * k;
+  }
+
+  if (brakeRequested) {
+    const forwardSpeed = car.vx * fX + car.vz * fZ;
+    const forwardBrake = Math.min(Math.abs(forwardSpeed), 12 * dt) * Math.sign(forwardSpeed);
+    car.vx -= fX * forwardBrake;
+    car.vz -= fZ * forwardBrake;
+    const lateralX = car.vx - fX * (forwardSpeed - forwardBrake);
+    const lateralZ = car.vz - fZ * (forwardSpeed - forwardBrake);
+    const lateralSpeed = Math.hypot(lateralX, lateralZ);
+    const lateralBrake = Math.min(lateralSpeed, 8 * dt);
+    if (lateralSpeed > 0) {
+      car.vx -= lateralX / lateralSpeed * lateralBrake;
+      car.vz -= lateralZ / lateralSpeed * lateralBrake;
+    }
   }
 
   car.speed = Math.hypot(car.vx, car.vz);
@@ -268,7 +281,7 @@ export function drive(car, dt) {
     });
   }
   if (car.tailMat) {
-    const braking = throttle !== 0 && Math.sign(throttle) !== Math.sign(fw0) && Math.abs(fw0) > 0.3;
+    const braking = brakeRequested || (throttle !== 0 && Math.sign(throttle) !== Math.sign(fw0) && Math.abs(fw0) > 0.3);
     car.tailMat.color.setHex(braking ? 0xff2a1a : throttle < 0 ? 0xffe8c0 : 0x7a1410);
   }
   // Body pitch under throttle and roll in corners.

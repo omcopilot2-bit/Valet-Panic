@@ -141,18 +141,21 @@ body[data-mode=rush] .metric #lives{color:var(--sky);letter-spacing:0}
 .joystick-base{position:relative;width:124px;height:124px;border:2px solid #ffffff70;border-radius:50%;background:radial-gradient(circle,#ffffff1c 0 42%,#07131dd9 43% 100%);box-shadow:0 5px 16px #0008;touch-action:none}
 .joystick-knob{position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px;border:2px solid #ffffff9e;border-radius:50%;background:linear-gradient(145deg,#fff9,#a9bdc9d9);box-shadow:0 4px 10px #0008;pointer-events:none}
 .steer-control{display:grid;place-items:center;width:124px;height:124px;border:0;border-radius:50%;background:#07131dd9;box-shadow:0 5px 16px #0008;touch-action:none}
-.steering-wheel{position:relative;display:block;width:104px;height:104px;border:9px solid #d5e0e6;border-radius:50%;box-shadow:inset 0 0 0 2px #405560,0 0 0 2px #203440;transition:transform .11s linear}
+.steering-wheel{position:relative;display:block;width:104px;height:104px;border:9px solid #d5e0e6;border-radius:50%;box-shadow:inset 0 0 0 2px #405560,0 0 0 2px #203440;transition:transform .22s cubic-bezier(.2,.8,.2,1)}
 .steering-wheel:before,.steering-wheel:after{content:'';position:absolute;left:50%;top:50%;background:#d5e0e6;transform:translate(-50%,-50%)}
 .steering-wheel:before{width:8px;height:45px}
 .steering-wheel:after{width:45px;height:8px}
 .wheel-marker{position:absolute;left:50%;top:-8px;width:11px;height:12px;border-radius:4px;background:var(--gold);transform:translateX(-50%)}
 .steering-hub{position:absolute;left:50%;top:50%;width:25px;height:25px;border:4px solid #405560;border-radius:50%;background:#d5e0e6;transform:translate(-50%,-50%)}
 .pad-right{display:flex;flex-direction:column;align-items:flex-end;gap:8px;pointer-events:none}
-.drive-pedals{display:flex;gap:8px;pointer-events:none}
+.drive-pedals{display:grid;width:208px;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;pointer-events:none}
 .pedal,.mobile-honk,.mobile-park{display:grid;place-items:center;border:2px solid #ffffff55;border-radius:18px;color:var(--cream);background:#0a1822e8;box-shadow:0 4px 10px #0006;pointer-events:auto;touch-action:none;-webkit-tap-highlight-color:transparent}
-.pedal{width:90px;height:76px;border-radius:20px;font:800 20px/1 'Fredoka','Trebuchet MS','Segoe UI',system-ui,sans-serif}
+.pedal{width:100%;min-width:0;height:84px;border-radius:20px;font:800 20px/1 'Fredoka','Trebuchet MS','Segoe UI',system-ui,sans-serif}
 .pedal small{font:800 9px/1 'Nunito','Segoe UI',system-ui,sans-serif;letter-spacing:.04em}
 .pedal.gas{background:var(--mint);border-color:#a6f2d2;color:#082719}
+.pedal.reverse{grid-column:1/-1;grid-row:2;height:54px;background:#233b49;border-color:#78909c}
+#brakeBtn{grid-column:1;grid-row:1}
+#gasBtn{grid-column:2;grid-row:1}
 .pedal:active,.mobile-honk:active{filter:brightness(1.25)}
 .mobile-honk{display:none;width:52px;height:52px;border-radius:50%}
 .mobile-honk img{width:30px;height:30px;filter:brightness(0) invert(1)}
@@ -166,12 +169,12 @@ body[data-mode=rush] .mobile-honk{display:grid}
 @media(max-width:900px){
  .instruction{display:none}
  .mobile-controls{display:flex}
- .left-control{width:120px}
- .joystick-base,.steer-control{width:112px;height:112px}
- .joystick-knob{width:48px;height:48px;margin:-24px}
- .steering-wheel{width:94px;height:94px}
- .steering-wheel:before{height:40px}
- .steering-wheel:after{width:40px}
+ .left-control{width:128px}
+ .joystick-base,.steer-control{width:120px;height:120px}
+ .joystick-knob{width:52px;height:52px;margin:-26px}
+ .steering-wheel{width:104px;height:104px}
+ .steering-wheel:before{height:44px}
+ .steering-wheel:after{width:44px}
  .pickup-banner{bottom:auto;top:calc(178px + var(--safe-top));min-width:0;width:min(420px,92vw)}
 }
 @media(max-width:900px){
@@ -203,6 +206,17 @@ body[data-device="mobile"] .mobile-controls,body[data-device="tablet"] .mobile-c
 body[data-device="mobile"] .instruction,body[data-device="tablet"] .instruction{display:none}
 body[data-device="mobile"] .pickup-banner,body[data-device="tablet"] .pickup-banner{bottom:auto;top:calc(178px + var(--safe-top));min-width:0;width:min(420px,92vw)}
 @media(max-width:500px){
+ .mobile-controls{inset:auto calc(18px + var(--safe-right)) calc(16px + var(--safe-bottom)) calc(18px + var(--safe-left))}
+ .left-control{width:128px}
+ .joystick-base,.steer-control{width:120px;height:120px}
+ .joystick-knob{width:52px;height:52px;margin:-26px}
+ .steering-wheel{width:104px;height:104px}
+ .steering-wheel:before{height:44px}
+ .steering-wheel:after{width:44px}
+ .pedal{height:84px}
+ .mobile-honk{width:60px;height:60px}
+ .mobile-honk img{width:34px;height:34px}
+ .mobile-park{width:122px;height:56px;font-size:20px}
  .hud{top:calc(8px + var(--safe-top));left:calc(8px + var(--safe-left));right:calc(112px + var(--safe-right));display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}
  .metric{padding:5px 4px}
  .metric label{font-size:7px;letter-spacing:.02em;white-space:nowrap}
@@ -210,25 +224,55 @@ body[data-device="mobile"] .pickup-banner,body[data-device="tablet"] .pickup-ban
  .top-right{top:calc(8px + var(--safe-top));right:calc(8px + var(--safe-right));gap:4px}
 .sound,.fullscreen{width:44px;height:44px}
 }
-@media(max-height:480px){
-.mobile-controls{inset:auto calc(10px + var(--safe-right)) calc(8px + var(--safe-bottom)) calc(10px + var(--safe-left))}
-.left-control{width:100px;gap:3px}
-.control-label{font-size:8px}
-.joystick-base,.steer-control{width:94px;height:94px}
-.joystick-knob{width:42px;height:42px;margin:-21px}
-.steering-wheel{width:78px;height:78px;border-width:7px}
-.steering-wheel:before{height:32px;width:6px}
-.steering-wheel:after{width:32px;height:6px}
-.steering-hub{width:20px;height:20px}
-.pad-right{gap:5px}
-.drive-pedals{gap:5px}
-.pedal{width:78px;height:62px;border-radius:16px;font-size:17px}
-.pedal small{font-size:8px}
-.mobile-honk{width:52px;height:52px}
-.mobile-park{width:100px;height:48px;font-size:17px}
+@media(max-height:480px) and (max-width:900px){
+ .mobile-controls{inset:auto calc(22px + var(--safe-right)) calc(18px + var(--safe-bottom)) calc(22px + var(--safe-left))}
+ .left-control{width:128px;gap:6px}
+ .control-label{font-size:10px}
+ .joystick-base,.steer-control{width:120px;height:120px}
+ .joystick-knob{width:52px;height:52px;margin:-26px}
+ .steering-wheel{width:104px;height:104px;border-width:8px}
+ .steering-wheel:before{height:42px;width:7px}
+ .steering-wheel:after{width:42px;height:7px}
+ .steering-hub{width:24px;height:24px}
+ .pad-right{gap:7px}
+ .drive-pedals{width:292px;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+ .pedal{height:78px;border-radius:18px;font-size:19px}
+ .pedal small{font-size:9px}
+ .pedal.reverse{grid-column:2;grid-row:1;height:78px}
+ #gasBtn{grid-column:3}
+ .mobile-honk{width:60px;height:60px}
+ .mobile-honk img{width:34px;height:34px}
+ .mobile-park{width:122px;height:56px;font-size:20px}
 }
 @media(max-width:360px){
- .pedal{width:78px;height:68px}
+ .mobile-controls{inset:auto calc(14px + var(--safe-right)) calc(14px + var(--safe-bottom)) calc(14px + var(--safe-left))}
+ .left-control{width:104px}
+ .joystick-base,.steer-control{width:100px;height:100px}
+ .joystick-knob{width:44px;height:44px;margin:-22px}
+ .steering-wheel{width:86px;height:86px;border-width:7px}
+ .steering-wheel:before{height:34px;width:6px}
+ .steering-wheel:after{width:34px;height:6px}
+ .pedal{height:74px}
+ .pedal.reverse{height:48px}
+ .mobile-honk{width:54px;height:54px}
+ .mobile-honk img{width:30px;height:30px}
+ .mobile-park{width:108px;height:50px;font-size:18px}
+}
+@media(max-width:420px) and (max-height:480px){
+ .mobile-controls{inset:auto calc(12px + var(--safe-right)) calc(12px + var(--safe-bottom)) calc(12px + var(--safe-left))}
+ .left-control{width:96px}
+ .joystick-base,.steer-control{width:90px;height:90px}
+ .joystick-knob{width:40px;height:40px;margin:-20px}
+ .steering-wheel{width:78px;height:78px;border-width:7px}
+ .steering-wheel:before{height:31px;width:6px}
+ .steering-wheel:after{width:31px;height:6px}
+ .steering-hub{width:20px;height:20px}
+ .drive-pedals{width:200px}
+ .pedal{height:68px;font-size:16px}
+ .pedal small{font-size:8px}
+ .mobile-honk{width:50px;height:50px}
+ .mobile-honk img{width:28px;height:28px}
+ .mobile-park{width:100px;height:48px;font-size:17px}
 }
 @media(max-height:480px){
  .mode-desc{display:none}
@@ -371,7 +415,7 @@ body{-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-se
  <div class="pad-right">
   <button class="mobile-honk" id="honkBtn" aria-label="Honk" title="Honk"><img src="./assets/ui/bullhorn.svg" alt=""></button>
   <button class="mobile-park" id="parkBtn">ACTION</button>
-  <div class="drive-pedals"><button class="pedal" id="brakeBtn" aria-label="Brake and reverse"><span>▼</span><small>BRAKE / REV</small></button><button class="pedal gas" id="gasBtn" aria-label="Accelerate"><span>▲</span><small>GAS</small></button></div>
+  <div class="drive-pedals"><button class="pedal" id="brakeBtn" aria-label="Brake"><span>▼</span><small>BRAKE</small></button><button class="pedal reverse" id="reverseBtn" aria-label="Reverse"><span>R</span><small>REVERSE</small></button><button class="pedal gas" id="gasBtn" aria-label="Accelerate"><span>▲</span><small>GAS</small></button></div>
  </div>
 </div>
 <div class="toast" id="toast" role="status"></div>

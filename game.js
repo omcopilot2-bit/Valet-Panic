@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { preload, seedCars } from './cars.js';
 import { parkCar, start, updateClassic, updateHUD } from './classic.js';
 import { LEVELS, reduceMotion } from './config.js';
-import { addFx, audio, camera, clock, markAllSlots, renderer, scene, toast } from './core.js';
+import { addFx, audio, camera, canvas, clock, markAllSlots, renderer, scene, toast } from './core.js';
 import { animateCars, updateFx } from './fx.js';
 import { addControls, renderSoundButton, updateMobileControls } from './input.js';
 import { addPauseUI, applyCosmetics, setTitleButtons, showLevelSelect, showSceneLab, showTitle, updateBestLine } from './menus.js';
@@ -52,7 +52,9 @@ function update(dt) {
   }
 
   updateMobileControls();
-  const portrait = innerWidth / innerHeight < 0.9 && (G.mode === 'rush' || Boolean(G.activeCar));
+  const viewWidth = canvas.clientWidth || innerWidth;
+  const viewHeight = canvas.clientHeight || innerHeight;
+  const portrait = viewWidth / viewHeight < 0.9 && (G.mode === 'rush' || Boolean(G.activeCar));
   if (portrait !== cameraUsesPortraitFollow) {
     cameraUsesPortraitFollow = portrait;
     resize();
@@ -120,7 +122,6 @@ function setQuality(q) {
   if (q === quality) return;
   quality = q;
   const low = q === 'low';
-  renderer.setPixelRatio(low ? 1 : Math.min(devicePixelRatio, 1.6));
   const size = low ? 1024 : 2048;
   moonLight.shadow.mapSize.set(size, size);
   if (moonLight.shadow.map) { moonLight.shadow.map.dispose(); moonLight.shadow.map = null; }
@@ -134,11 +135,13 @@ for (const x of [-16.5, 16.5]) {
   FIT_POINTS.push(new THREE.Vector3(x, 3, -10.2), new THREE.Vector3(x, 0, -10.2), new THREE.Vector3(x, 0, 9.9));
 }
 
-// Landscape shows the whole lot; portrait keeps the landscape scale and follows the active valet/car instead of shrinking the scene.
+// Landscape frames the lot for touch controls; portrait keeps the landscape scale and follows the active valet/car.
 function resize() {
-  const W = innerWidth, H = innerHeight, aspect = W / H;
+  const W = canvas.clientWidth || innerWidth, H = canvas.clientHeight || innerHeight, aspect = W / H;
   const portrait = aspect < 0.9 && (G.mode === 'rush' || Boolean(G.activeCar));
   cameraUsesPortraitFollow = portrait;
+  const pixelRatio = Math.min(window.devicePixelRatio || 1, quality === 'low' ? 1.75 : 2);
+  if (renderer.getPixelRatio() !== pixelRatio) renderer.setPixelRatio(pixelRatio);
   renderer.setSize(W, H, false);
   if (!portrait) cameraFocus = { x: 0, z: -1.7 };
   camera.position.set(portrait ? cameraFocus.x : 0, 25, portrait ? cameraFocus.z + 20.7 : 19);
@@ -155,13 +158,16 @@ function resize() {
   const spanX = maxX - minX, spanY = maxY - minY;
 
   // Breathing room in pixels: a little at the top, more at the bottom on touch layouts (on-screen controls).
-  const padTop = Math.min(H * 0.05, 40);
-  const padBot = portrait ? Math.min(H * 0.2, 170) : W <= 900 ? Math.min(H * 0.16, 110) : Math.min(H * 0.04, 30);
+  const mobileLandscape = W <= 900 && H <= 600 && aspect >= 0.9;
+  const padTop = mobileLandscape ? Math.min(H * 0.035, 24) : Math.min(H * 0.05, 40);
+  const padBot = portrait ? Math.min(H * 0.2, 170)
+    : mobileLandscape ? Math.min(H * 0.09, 58)
+      : W <= 900 ? Math.min(H * 0.16, 110) : Math.min(H * 0.04, 30);
   const pf = Math.min(0.5, (padTop + padBot) / H);
   const landscapePad = (Math.min(H * 0.05, 40) + Math.min(H * 0.04, 30)) / H;
   const landscapeScale = Math.max(spanY / (1 - landscapePad), spanX / (16 / 9));
 
-  const visibleH = portrait ? landscapeScale : Math.max(spanY / (1 - pf), spanX / aspect);
+  const visibleH = (portrait ? landscapeScale : Math.max(spanY / (1 - pf), spanX / aspect)) * (mobileLandscape ? 0.95 : 1);
   const visibleW = visibleH * aspect;
   const cx = (minX + maxX) / 2;
   const cy = (minY + maxY) / 2 + (padTop - padBot) / 2 / H * visibleH;

@@ -12,7 +12,7 @@ import { cars, G, keys, layout, rush, touchInput } from './state.js';
 
 // Peeking: mouse = hover for a moment, touch/pen = press and hold. A quick click/tap selects the car.
 let peekTimerId = 0, peekArmed = null, peekFired = false;
-let walkPointer = null, steerPointer = null, steerStartX = 0, steerStartValue = 0;
+let walkPointer = null, steerPointer = null, steerStartValue = 0, steerLastAngle = null, steerAccumulatedAngle = 0;
 const mobileControlsElement = $('#mobileControls');
 
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
@@ -28,6 +28,9 @@ function resetWalk() {
 function resetSteering() {
   steerPointer = null;
   touchInput.steer = 0;
+  touchInput.steerTarget = 0;
+  steerLastAngle = null;
+  steerAccumulatedAngle = 0;
   const wheel = $('#steeringWheel');
   if (wheel) wheel.style.transform = 'rotate(0deg)';
   const control = $('#steerControl');
@@ -37,7 +40,7 @@ function resetSteering() {
 function resetPedals() {
   touchInput.gas = false;
   touchInput.brake = false;
-  touchInput.brakeStoppedTime = 0;
+  touchInput.reverse = false;
 }
 
 export function updateMobileControls() {
@@ -205,22 +208,44 @@ export function addControls() {
   const moveSteering = (e) => {
     if (steerPointer !== e.pointerId || mobileControls.dataset.state !== 'driving') return;
     const rect = steerControl.getBoundingClientRect();
-    touchInput.steer = clamp(steerStartValue - (e.clientX - steerStartX) / (rect.width * 0.34), -1, 1);
-    steeringWheel.style.transform = `rotate(${-touchInput.steer * 360}deg)`;
-    steerControl.setAttribute('aria-valuenow', String(Math.round(touchInput.steer * 100)));
+    const dx = e.clientX - (rect.left + rect.width / 2);
+    const dy = e.clientY - (rect.top + rect.height / 2);
+    if (Math.hypot(dx, dy) < rect.width * 0.2) {
+      steerLastAngle = null;
+      return;
+    }
+    const angle = Math.atan2(dy, dx);
+    if (steerLastAngle !== null) {
+      let delta = angle - steerLastAngle;
+      if (delta > Math.PI) delta -= Math.PI * 2;
+      else if (delta < -Math.PI) delta += Math.PI * 2;
+      steerAccumulatedAngle += delta;
+    }
+    steerLastAngle = angle;
+    touchInput.steerTarget = clamp(steerStartValue - steerAccumulatedAngle / (Math.PI * 2), -1, 1);
+    steeringWheel.style.transform = `rotate(${-touchInput.steerTarget * 720}deg)`;
+    steerControl.setAttribute('aria-valuenow', String(Math.round(touchInput.steerTarget * 100)));
   };
   steerControl.addEventListener('pointerdown', (e) => {
     if (mobileControls.dataset.state !== 'driving') return;
     e.preventDefault();
     steerPointer = e.pointerId;
-    steerStartX = e.clientX;
     steerStartValue = touchInput.steer;
+    steerAccumulatedAngle = 0;
+    steerLastAngle = null;
     steerControl.setPointerCapture(e.pointerId);
     moveSteering(e);
   });
   steerControl.addEventListener('pointermove', moveSteering);
   ['pointerup', 'pointercancel', 'lostpointercapture'].forEach((event) => {
-    steerControl.addEventListener(event, (e) => { if (steerPointer === e.pointerId) resetSteering(); });
+    steerControl.addEventListener(event, (e) => {
+      if (steerPointer !== e.pointerId) return;
+      steerPointer = null;
+      steerLastAngle = null;
+      touchInput.steerTarget = 0;
+      steeringWheel.style.transform = 'rotate(0deg)';
+      steerControl.setAttribute('aria-valuenow', '0');
+    });
   });
 
   const bindPedal = (button, pedal) => {
@@ -229,19 +254,21 @@ export function addControls() {
       if (pointerId !== null && e.pointerId !== pointerId) return;
       pointerId = null;
       touchInput[pedal] = false;
-      if (pedal === 'brake') touchInput.brakeStoppedTime = 0;
     };
     button.addEventListener('pointerdown', (e) => {
       if (mobileControls.dataset.state !== 'driving') return;
       e.preventDefault();
       pointerId = e.pointerId;
       button.setPointerCapture(e.pointerId);
-      touchInput[pedal] = true;
+      touchInput.gas = pedal === 'gas';
+      touchInput.brake = pedal === 'brake';
+      touchInput.reverse = pedal === 'reverse';
     });
     ['pointerup', 'pointercancel', 'lostpointercapture'].forEach((event) => button.addEventListener(event, release));
   };
   bindPedal($('#gasBtn'), 'gas');
   bindPedal($('#brakeBtn'), 'brake');
+  bindPedal($('#reverseBtn'), 'reverse');
   $('#parkBtn').addEventListener('pointerdown', (e) => { e.preventDefault(); parkCar(); });
   $('#honkBtn').addEventListener('pointerdown', (e) => { e.preventDefault(); honk(); });
 

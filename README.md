@@ -87,14 +87,14 @@ Every run earns XP (Memory and Duel runs; stars and first clears pay extra). Pla
 
 ## Controls
 - WASD / arrow keys: drive and steer (in Shifts: run, when you are on foot). Movement follows the physical key position, so French keyboards get ZQSD (and the hints say so on Chromium); the letter printed on the key works too. The boon picker accepts the digit row and the numpad.
-- Touch screens: use the left joystick to run on foot; while driving, drag the left steering wheel and hold the large **GAS** or **BRAKE / REV** pedals on the right. The horn icon honks; **ACTION** appears only when entering, parking, or handing over is currently valid. Use the fullscreen button for a wider view; rotate to landscape if the browser cannot lock orientation.
+- Touch screens: use the left joystick to run on foot; while driving, rotate the left steering wheel and hold **GAS**, **BRAKE**, or the separate **REVERSE** pedal on the right. The horn icon honks; **ACTION** appears only when entering, parking, or handing over is currently valid. Use the fullscreen button for a wider view; rotate to landscape if the browser cannot lock orientation.
 - E / Space / ACTION button: get into a car (Shifts, on foot), park, or hand a car over. In Shifts you also hop in by running up to the 🔑 / 🔔 car, and a gold arrow points the way.
 - Space: park when you are in the highlighted bay, lined up and moving slowly
 - Click/tap a parked car: return the car requested by the lobby
 - P or the ❚❚ button: pause/resume (Escape remains available to exit platform fullscreen; switching tabs also pauses)
 - H, or the on-screen horn icon on touch: honk (Shifts, while driving)
 - ♫: toggle sound
-- Touch: joystick on foot; steering wheel, gas, brake/reverse, and available-action controls while driving
+- Touch: joystick on foot; rotating steering wheel, gas, brake, reverse, and available-action controls while driving
 
 ## Run locally
 The game uses ES modules, so serve it over HTTP rather than opening `index.html` as `file://`:
