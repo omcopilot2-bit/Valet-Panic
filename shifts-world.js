@@ -1,13 +1,14 @@
-// Shifts support: level layout (closed bays and cones), power-up and bonus tokens, random events, honk and near-miss, the boon picker.
+// Shifts support: venue layouts and hazards, power-up and bonus tokens, random events, honk and near-miss, the boon picker.
 import * as THREE from 'three';
 import { CAR_BODY_OFFSETS, CAR_BODY_RADIUS } from './collision.js';
-import { duelGoals, HORNS, levelMods, PARKED_HALF, PARKING_LAYOUTS, PARKING_TYPES, POWERUPS, reduceMotion, RUSH_PERKS, SLOT_LAYOUTS, TOKEN_SPOTS } from './config.js';
+import { duelGoals, HORNS, levelMods, PARKING_LAYOUTS, PARKING_TYPES, POWERUPS, reduceMotion, RUSH_PERKS, SLOT_LAYOUTS, TOKEN_SPOTS } from './config.js';
 import { audio, parkRadius, popScore, scene, shuffle, toast, worldToScreen } from './core.js';
 import { cancelPeek } from './input.js';
 import { dropoff, guide, handoff, otherPeople } from './people.js';
 import * as platform from './platform.js';
 import { equippedItem } from './progress.js';
 import { addTime, cars, G, hooks, keys, rush, slots } from './state.js';
+import { customExitRoute, SIDE_R } from './routes.js';
 import { applyVenue, updateVenue, venueName } from './venues.js';
 import { mat } from './world.js';
 
@@ -250,37 +251,16 @@ export function offerShiftIntro(onDone) {
   if (first) first.focus({ preventScroll: true });
 }
 
-/* ---------- shift layout: closed bays and cones ---------- */
-let levelProps = null;
-
-// Orange-and-white hazard stripes with CLOSED on top of a closed bay's barrier block.
-function closedTexture() {
-  const can = document.createElement('canvas');
-  can.width = 190; can.height = 290;
-  const c = can.getContext('2d');
-  c.fillStyle = '#20262a';
-  c.fillRect(0, 0, 190, 290);
-  c.save();
-  c.beginPath(); c.rect(0, 0, 190, 290); c.rect(18, 18, 154, 254); c.clip('evenodd');
-  c.fillStyle = '#ff7a1a';
-  for (let i = -300; i < 480; i += 44) {
-    c.beginPath(); c.moveTo(i, 0); c.lineTo(i + 22, 0); c.lineTo(i + 22 + 290, 290); c.lineTo(i + 290, 290); c.fill();
-  }
-  c.restore();
-  c.fillStyle = '#fff7e6';
-  c.font = '700 40px Arial, sans-serif';
-  c.textAlign = 'center'; c.textBaseline = 'middle';
-  c.save(); c.translate(95, 145); c.rotate(-Math.PI / 2); c.fillText('CLOSED', 0, 0); c.restore();
-  const t = new THREE.CanvasTexture(can);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
-}
+/* ---------- shift layout: bay geometry and level props ---------- */
+let levelProps = null, fountainAnimation = null;
 
 function clearLevelProps() {
   G.colliders = G.colliders.filter((c) => !c.lv);
+  fountainAnimation = null;
   if (levelProps) {
     scene.remove(levelProps);
     levelProps.traverse((o) => {
+      if (o.isInstancedMesh) o.dispose();
       if (o.geometry) o.geometry.dispose();
       if (o.material) { if (o.material.map) o.material.map.dispose(); o.material.dispose(); }
     });
@@ -290,6 +270,9 @@ function clearLevelProps() {
     s.closed = false;
     s.exitRoute = undefined;
     s.layoutYaw = undefined;
+    s.mouthDirection = undefined;
+    s.routeSideX = undefined;
+    s.routePlan = undefined;
     if (s.baseX !== undefined) { s.x = s.baseX; s.z = s.baseZ; s.yaw = s.baseYaw; }
     if (s.group) { s.group.position.set(s.x, 0, s.z); s.group.rotation.y = s.yaw || 0; }
   });
@@ -304,12 +287,16 @@ export function applyLevelLayout(lv) {
   const parkingType = PARKING_TYPES[lv.id] || '90';
   const oblique = parkingType.includes('60');
   slots.forEach((s, i) => {
+    s.closed = false;
     if (s.baseX === undefined) { s.baseX = s.x; s.baseZ = s.z; s.baseYaw = s.yaw; }
     if (pilotLayout) {
       s.x = pilotLayout[i].x;
       s.z = pilotLayout[i].z;
       s.yaw = pilotLayout[i].yaw;
       s.layoutYaw = pilotLayout[i].yaw;
+      s.mouthDirection = lv.park === 'reverse' ? 1 : -1;
+      s.routeSideX = lv.id === 3 ? SIDE_R : undefined;
+      s.routePlan = lv.id === 3 ? 'casino' : undefined;
     } else {
       s.x = s.baseX + offsets[i][0];
       s.z = s.baseZ + offsets[i][1];
@@ -319,55 +306,79 @@ export function applyLevelLayout(lv) {
       const inward = s.baseZ < 0 ? Math.PI / 6 : Math.PI - Math.PI / 6;
       s.yaw = (inward + (lv.park === 'reverse' ? Math.PI : 0)) % (Math.PI * 2);
     } else if (!pilotLayout) s.yaw = lv.park === 'reverse' ? 0 : Math.PI;
-    s.exitRoute = pilotLayout ? [
-      { x: s.x - Math.sin(s.yaw) * 2.2, z: s.z - Math.cos(s.yaw) * 2.2, yaw: s.yaw },
-      { x: 11.4, z: 5.6 },
-      { x: 14.8, z: 6.2 },
-    ] : undefined;
+    s.exitRoute = pilotLayout ? customExitRoute(s) : undefined;
     if (s.group) { s.group.position.set(s.x, 0, s.z); s.group.rotation.y = s.yaw; }
   });
   levelProps = new THREE.Group();
   scene.add(levelProps);
 
-  slots.forEach((s, i) => {
-    if (lv.bays.includes(i)) return;
-    s.closed = true;                       // behaves like a parked car: solid, never assigned to a guest
-    const hatch = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 4.3),
-      new THREE.MeshBasicMaterial({ color: 0xff4d4d, transparent: true, opacity: 0.13, depthWrite: false }));
-    hatch.rotation.x = -Math.PI / 2;
-    hatch.rotation.y = s.yaw;
-    hatch.position.set(s.x, 0.06, s.z);
-    levelProps.add(hatch);
-    // A visible barrier exactly where the solid collision is, so a closed bay never feels like an invisible wall.
-    const blk = new THREE.Mesh(new THREE.BoxGeometry(PARKED_HALF.x * 2, 0.42, PARKED_HALF.z * 2), mat(0x2a2f33, 0.7));
-    blk.position.set(s.x, 0.21, s.z);
-    blk.rotation.y = s.yaw;
-    blk.castShadow = true;
-    blk.receiveShadow = true;
-    levelProps.add(blk);
-    const top = new THREE.Mesh(new THREE.PlaneGeometry(PARKED_HALF.x * 2 - 0.1, PARKED_HALF.z * 2 - 0.1),
-      new THREE.MeshBasicMaterial({ map: closedTexture(), toneMapped: false }));
-    top.rotation.x = -Math.PI / 2;
-    top.rotation.y = s.yaw;
-    top.position.set(s.x, 0.435, s.z);
-    levelProps.add(top);
-  });
-
   if (lv.id === 3) {
+    const roundabout = new THREE.Group();
+    roundabout.position.set(0, 0, 0.2);
+    levelProps.add(roundabout);
+    const gold = mat(0xb58a4f, 0.36, 0.62, { emissive: 0x49351d, emissiveIntensity: 0.35 });
+    const cyan = mat(0x55d7df, 0.3, 0.48, { emissive: 0x174d55, emissiveIntensity: 0.42 });
+    for (const [radius, material] of [[2.65, gold], [3.15, cyan]]) {
+      const inlay = new THREE.Mesh(new THREE.TorusGeometry(radius, 0.035, 8, 72), material);
+      inlay.rotation.x = Math.PI / 2;
+      inlay.position.y = 0.035;
+      inlay.receiveShadow = true;
+      roundabout.add(inlay);
+    }
+
     const fountain = new THREE.Group();
-    fountain.position.set(0, 0, 0.2);
-    levelProps.add(fountain);
-    const rim = new THREE.Mesh(new THREE.CylinderGeometry(2.1, 2.35, 0.32, 24), mat(0x756c85, 0.35, 0.35));
+    fountain.position.set(0, 0, 0);
+    roundabout.add(fountain);
+    const rim = new THREE.Mesh(new THREE.CylinderGeometry(1.72, 1.88, 0.32, 48), mat(0x393a4b, 0.3, 0.6));
     rim.position.y = 0.16;
     rim.castShadow = true;
+    rim.receiveShadow = true;
     fountain.add(rim);
-    const water = new THREE.Mesh(new THREE.CylinderGeometry(1.72, 1.72, 0.08, 24), mat(0x38e8ff, 0.12, 0.25, { emissive: 0x15727a, emissiveIntensity: 0.8 }));
-    water.position.y = 0.34;
+    const trim = new THREE.Mesh(new THREE.TorusGeometry(1.67, 0.06, 10, 48), gold);
+    trim.rotation.x = Math.PI / 2;
+    trim.position.y = 0.34;
+    fountain.add(trim);
+    const water = new THREE.Mesh(new THREE.CylinderGeometry(1.52, 1.52, 0.08, 48), mat(0x157c91, 0.2, 0.35, { emissive: 0x07515f, emissiveIntensity: 0.45 }));
+    water.position.y = 0.35;
     fountain.add(water);
-    const jet = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.25, 1.8, 12), mat(0xff78cf, 0.2, 0.2, { emissive: 0x8c2a76, emissiveIntensity: 0.7 }));
-    jet.position.y = 1.15;
-    jet.castShadow = true;
-    fountain.add(jet);
+    const nozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.17, 0.12, 24), gold);
+    nozzle.position.y = 0.45;
+    fountain.add(nozzle);
+    const spray = mat(0x9feef7, 0.12, 0.08, { emissive: 0x2ba6b7, emissiveIntensity: 0.45, transparent: true, opacity: 0.9, depthWrite: false });
+    const ripples = [0.48, 0.78].map((radius) => {
+      const ripple = new THREE.Mesh(new THREE.TorusGeometry(radius, 0.018, 6, 40),
+        new THREE.MeshBasicMaterial({ color: 0x76ecf3, transparent: true, opacity: 0.55, depthWrite: false }));
+      ripple.rotation.x = Math.PI / 2;
+      ripple.position.y = 0.405;
+      fountain.add(ripple);
+      return ripple;
+    });
+    const dropletCount = 128, streamCount = 8;
+    const streamCapacity = Math.ceil(dropletCount / streamCount);
+    const random = (seed) => {
+      const value = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
+      return value - Math.floor(value);
+    };
+    const droplets = Array.from({ length: dropletCount }, (_, i) => {
+      const stream = i % streamCount;
+      const speed = 1.8 + random(i + 1) * 0.45;
+      const gravity = 2.8 + random(i + 257) * 0.35;
+      const lifetime = (speed + Math.sqrt(speed * speed - 2 * gravity * 0.11)) / gravity;
+      return {
+        angle: stream * Math.PI * 2 / streamCount + (random(i + 521) - 0.5) * 0.18,
+        phase: (Math.floor(i / streamCount) + 0.15 + random(i + 787) * 0.7) / streamCapacity,
+        speed,
+        gravity,
+        lifetime,
+        outwardSpeed: 0.28 + random(i + 1031) * 0.3,
+        size: 0.035 + random(i + 1277) * 0.016
+      };
+    });
+    const dropletCloud = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 8, 6), spray, dropletCount);
+    dropletCloud.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    dropletCloud.frustumCulled = false;
+    fountain.add(dropletCloud);
+    fountainAnimation = { elapsed: 0, water, ripples, droplets, dropletCloud, dropletTransform: new THREE.Object3D() };
   }
 
   if (lv.id === 5) {
@@ -377,15 +388,6 @@ export function applyLevelLayout(lv) {
     carpet.position.set(0, 0.07, 0);
     carpet.receiveShadow = true;
     levelProps.add(carpet);
-  }
-
-  if (lv.id === 6) {
-    for (const z of [-5.2, 5.8]) {
-      const curb = new THREE.Mesh(new THREE.BoxGeometry(24.5, 0.22, 0.34), mat(0xd7d8d2, 0.7));
-      curb.position.set(0, 0.11, z);
-      curb.castShadow = true;
-      levelProps.add(curb);
-    }
   }
 
   if (parkingType.includes('island')) {
@@ -428,6 +430,26 @@ export function applyLevelLayout(lv) {
 // Venue-only animation; level hazards such as cones are updated elsewhere.
 export function updateLevelProps(dt) {
   updateVenue(dt);
+  if (!fountainAnimation) return;
+  const animation = fountainAnimation;
+  animation.elapsed += dt;
+  animation.water.material.emissiveIntensity = 0.4 + 0.08 * Math.sin(animation.elapsed * 2.4);
+  animation.ripples.forEach((ripple, i) => {
+    const phase = (animation.elapsed * 0.55 + i * 0.5) % 1;
+    const scale = 0.75 + phase * 0.7;
+    ripple.scale.set(scale, 1, scale);
+    ripple.material.opacity = 0.6 * (1 - phase);
+  });
+  animation.droplets.forEach((drop, i) => {
+    const age = ((animation.elapsed / drop.lifetime + drop.phase) % 1) * drop.lifetime;
+    const radius = 0.08 + drop.outwardSpeed * age;
+    const y = 0.51 + drop.speed * age - 0.5 * drop.gravity * age * age;
+    animation.dropletTransform.position.set(Math.cos(drop.angle) * radius, y, Math.sin(drop.angle) * radius);
+    animation.dropletTransform.scale.setScalar(drop.size);
+    animation.dropletTransform.updateMatrix();
+    animation.dropletCloud.setMatrixAt(i, animation.dropletTransform.matrix);
+  });
+  animation.dropletCloud.instanceMatrix.needsUpdate = true;
 }
 
 // Shows the PICK-UP and DROP-OFF rings while a shift is running, and hides the guide arrow otherwise.

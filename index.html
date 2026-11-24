@@ -10,9 +10,9 @@
 *{box-sizing:border-box}
 @font-face{font-family:Fredoka;src:url("./assets/fonts/fredoka-latin.woff2") format("woff2");font-style:normal;font-weight:500 700;font-display:swap;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
 @font-face{font-family:Nunito;src:url("./assets/fonts/nunito-latin.woff2") format("woff2");font-style:normal;font-weight:600 800;font-display:swap;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
-html,body{width:100%;height:100%;margin:0;overflow:hidden;background:var(--night);color:var(--cream);font-family:'Nunito','Segoe UI',system-ui,sans-serif;font-weight:700}
+html,body{width:100%;height:100%;min-height:100vh;min-height:100dvh;margin:0;overflow:hidden;background:var(--night);color:var(--cream);font-family:'Nunito','Segoe UI',system-ui,sans-serif;font-weight:700}
 button{font-family:inherit}
-#game{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+#game{position:fixed;inset:0;width:100%;height:100vh;height:100dvh;display:block;touch-action:none}
 .vignette{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 45%,transparent 58%,#06101866 100%)}
 .grain{display:none}
 
@@ -32,15 +32,15 @@ button{font-family:inherit}
 .jar.pop{animation:jarpop .5s}
 @keyframes jarpop{50%{transform:scale(1.1);border-color:var(--gold)}}
 .swatch{display:inline-block;width:.8em;height:.8em;border-radius:50%;border:2px solid var(--cream);margin:0 .35em 0 .1em;vertical-align:-.05em}
-.top-right{position:fixed;top:calc(20px + var(--safe-top));right:calc(24px + var(--safe-right));z-index:2;display:flex;gap:10px;align-items:center}
+.top-right{position:fixed;top:calc(20px + var(--safe-top));right:calc(24px + var(--safe-right));z-index:7;display:flex;gap:10px;align-items:center}
 .shift-chip{height:52px;padding:0 18px;display:flex;align-items:center;gap:12px;border-radius:18px;background:var(--panel);border:2px solid var(--line);pointer-events:none}
 .shift-chip #step{font:600 18px/1 'Fredoka','Trebuchet MS','Segoe UI',system-ui,sans-serif;white-space:nowrap}
 .bar{width:96px;height:12px;border-radius:999px;background:#ffffff24;overflow:hidden}
 .bar i{display:block;height:100%;width:0;border-radius:999px;background:var(--mint);transition:width .3s}
-.sound{pointer-events:auto;cursor:pointer;color:var(--cream);background:var(--panel);border:2px solid var(--line);width:52px;height:52px;padding:0;border-radius:50%;display:grid;place-items:center;font-size:22px}
-.sound:hover{border-color:var(--gold);color:var(--gold)}
+.sound,.fullscreen{pointer-events:auto;cursor:pointer;color:var(--cream);background:var(--panel);border:2px solid var(--line);width:52px;height:52px;padding:0;border-radius:50%;display:grid;place-items:center;font-size:22px}
+.sound:hover,.fullscreen:hover{border-color:var(--gold);color:var(--gold)}
 .sound:disabled{opacity:.55;cursor:not-allowed}
-.sound:focus-visible,.play:focus-visible,.pad button:focus-visible{outline:3px solid var(--sky);outline-offset:3px}
+.sound:focus-visible,.fullscreen:focus-visible,.play:focus-visible,.mobile-controls button:focus-visible{outline:3px solid var(--sky);outline-offset:3px}
 
 /* Brief card (top centre) */
 .objective{position:fixed;top:calc(100px + var(--safe-top));left:50%;transform:translateX(-50%);z-index:2;width:min(480px,92vw);padding:14px 22px;border-radius:24px;background:var(--gold);color:var(--ink);box-shadow:0 8px 0 var(--gold-d);pointer-events:none;transition:background .25s,box-shadow .25s}
@@ -134,21 +134,44 @@ body[data-mode=rush] .metric #lives{color:var(--sky);letter-spacing:0}
 @keyframes float{to{opacity:0;transform:translateY(-44px)}}
 
 /* Touch controls */
-.mobile-controls{display:none;position:fixed;inset:auto calc(14px + var(--safe-right)) calc(14px + var(--safe-bottom)) calc(14px + var(--safe-left));z-index:3;pointer-events:none;justify-content:space-between;align-items:end}
-.pad{display:grid;grid-template-columns:repeat(3,64px);grid-template-rows:64px 64px;gap:6px;pointer-events:auto}
-.pad button{display:grid;place-items:center;padding:0;border:2px solid #ffffff4d;border-radius:18px;background:#0a1822d1;color:var(--cream);font:700 28px/1 'Fredoka','Trebuchet MS','Segoe UI',system-ui,sans-serif;touch-action:none;-webkit-tap-highlight-color:transparent}
-.pad button:active{background:var(--gold);color:var(--ink)}
-.pad button[data-key=ArrowUp]{grid-column:2}.pad button[data-key=ArrowLeft]{grid-column:1;grid-row:2}.pad button[data-key=ArrowDown]{grid-column:2;grid-row:2}.pad button[data-key=ArrowRight]{grid-column:3;grid-row:2}
-.mobile-park{width:120px;height:96px;border:0;border-radius:26px;background:var(--gold);color:var(--ink);box-shadow:0 7px 0 var(--gold-d);font:700 28px/1 'Fredoka','Trebuchet MS','Segoe UI',system-ui,sans-serif;pointer-events:auto;touch-action:none}
-.mobile-park:active{transform:translateY(4px);box-shadow:0 3px 0 var(--gold-d)}
-.pad-right{display:flex;flex-direction:column;align-items:flex-end;gap:10px;pointer-events:none}
-.mobile-honk{display:none;width:96px;height:56px;border:2px solid #ffffff4d;border-radius:20px;background:#0a1822d1;color:var(--cream);font:700 20px/1 'Fredoka','Trebuchet MS','Segoe UI',system-ui,sans-serif;pointer-events:auto;touch-action:none;-webkit-tap-highlight-color:transparent}
-.mobile-honk:active{background:var(--sky);color:#06202f}
-body[data-mode=rush] .mobile-honk{display:block}
+.mobile-controls{display:none;position:fixed;inset:auto calc(14px + var(--safe-right)) calc(14px + var(--safe-bottom)) calc(14px + var(--safe-left));z-index:3;pointer-events:none;justify-content:space-between;align-items:flex-end}
+.mobile-controls[data-state=hidden]{visibility:hidden;pointer-events:none}
+.left-control{width:136px;display:flex;flex-direction:column;align-items:center;gap:5px;color:var(--cream);pointer-events:auto;touch-action:none}
+.control-label{font:800 10px/1 'Nunito','Segoe UI',system-ui,sans-serif;letter-spacing:.14em;text-shadow:0 2px 4px #000}
+.joystick-base{position:relative;width:124px;height:124px;border:2px solid #ffffff70;border-radius:50%;background:radial-gradient(circle,#ffffff1c 0 42%,#07131dd9 43% 100%);box-shadow:0 5px 16px #0008;touch-action:none}
+.joystick-knob{position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px;border:2px solid #ffffff9e;border-radius:50%;background:linear-gradient(145deg,#fff9,#a9bdc9d9);box-shadow:0 4px 10px #0008;pointer-events:none}
+.steer-control{display:grid;place-items:center;width:124px;height:124px;border:0;border-radius:50%;background:#07131dd9;box-shadow:0 5px 16px #0008;touch-action:none}
+.steering-wheel{position:relative;display:block;width:104px;height:104px;border:9px solid #d5e0e6;border-radius:50%;box-shadow:inset 0 0 0 2px #405560,0 0 0 2px #203440;transition:transform .11s linear}
+.steering-wheel:before,.steering-wheel:after{content:'';position:absolute;left:50%;top:50%;background:#d5e0e6;transform:translate(-50%,-50%)}
+.steering-wheel:before{width:8px;height:45px}
+.steering-wheel:after{width:45px;height:8px}
+.wheel-marker{position:absolute;left:50%;top:-8px;width:11px;height:12px;border-radius:4px;background:var(--gold);transform:translateX(-50%)}
+.steering-hub{position:absolute;left:50%;top:50%;width:25px;height:25px;border:4px solid #405560;border-radius:50%;background:#d5e0e6;transform:translate(-50%,-50%)}
+.pad-right{display:flex;flex-direction:column;align-items:flex-end;gap:8px;pointer-events:none}
+.drive-pedals{display:flex;gap:8px;pointer-events:none}
+.pedal,.mobile-honk,.mobile-park{display:grid;place-items:center;border:2px solid #ffffff55;border-radius:18px;color:var(--cream);background:#0a1822e8;box-shadow:0 4px 10px #0006;pointer-events:auto;touch-action:none;-webkit-tap-highlight-color:transparent}
+.pedal{width:90px;height:76px;border-radius:20px;font:800 20px/1 'Fredoka','Trebuchet MS','Segoe UI',system-ui,sans-serif}
+.pedal small{font:800 9px/1 'Nunito','Segoe UI',system-ui,sans-serif;letter-spacing:.04em}
+.pedal.gas{background:var(--mint);border-color:#a6f2d2;color:#082719}
+.pedal:active,.mobile-honk:active{filter:brightness(1.25)}
+.mobile-honk{display:none;width:52px;height:52px;border-radius:50%}
+.mobile-honk img{width:30px;height:30px;filter:brightness(0) invert(1)}
+.mobile-park{display:none;width:108px;height:52px;border:0;border-radius:18px;background:var(--gold);color:var(--ink);box-shadow:0 5px 0 var(--gold-d);font:700 19px/1 'Fredoka','Trebuchet MS','Segoe UI',system-ui,sans-serif}
+.mobile-controls.has-action .mobile-park{display:grid}
+.mobile-park:active{transform:translateY(3px);box-shadow:0 2px 0 var(--gold-d)}
+.mobile-controls[data-state=walking] .steering-group,.mobile-controls[data-state=walking] .drive-pedals{display:none}
+.mobile-controls[data-state=driving] .move-control{display:none}
+body[data-mode=rush] .mobile-honk{display:grid}
 
 @media(max-width:900px){
  .instruction{display:none}
  .mobile-controls{display:flex}
+ .left-control{width:120px}
+ .joystick-base,.steer-control{width:112px;height:112px}
+ .joystick-knob{width:48px;height:48px;margin:-24px}
+ .steering-wheel{width:94px;height:94px}
+ .steering-wheel:before{height:40px}
+ .steering-wheel:after{width:40px}
  .pickup-banner{bottom:auto;top:calc(178px + var(--safe-top));min-width:0;width:min(420px,92vw)}
 }
 @media(max-width:900px){
@@ -162,7 +185,7 @@ body[data-mode=rush] .mobile-honk{display:block}
  .perks{grid-template-columns:1fr}
  .perk{flex-direction:row;flex-wrap:wrap;align-items:center}
  .perk em{margin:0 0 0 auto}
- .sound{width:46px;height:46px}
+ .sound,.fullscreen{width:46px;height:46px}
  .objective{top:calc(70px + var(--safe-top));padding:8px 14px;border-radius:18px}
  .call-main{font-size:20px}
  .call-label{font-size:10px}
@@ -185,7 +208,27 @@ body[data-device="mobile"] .pickup-banner,body[data-device="tablet"] .pickup-ban
  .metric label{font-size:7px;letter-spacing:.02em;white-space:nowrap}
  .metric strong{font-size:clamp(13px,3.8vw,17px);margin-top:3px;white-space:nowrap}
  .top-right{top:calc(8px + var(--safe-top));right:calc(8px + var(--safe-right));gap:4px}
- .sound{width:44px;height:44px}
+.sound,.fullscreen{width:44px;height:44px}
+}
+@media(max-height:480px){
+.mobile-controls{inset:auto calc(10px + var(--safe-right)) calc(8px + var(--safe-bottom)) calc(10px + var(--safe-left))}
+.left-control{width:100px;gap:3px}
+.control-label{font-size:8px}
+.joystick-base,.steer-control{width:94px;height:94px}
+.joystick-knob{width:42px;height:42px;margin:-21px}
+.steering-wheel{width:78px;height:78px;border-width:7px}
+.steering-wheel:before{height:32px;width:6px}
+.steering-wheel:after{width:32px;height:6px}
+.steering-hub{width:20px;height:20px}
+.pad-right{gap:5px}
+.drive-pedals{gap:5px}
+.pedal{width:78px;height:62px;border-radius:16px;font-size:17px}
+.pedal small{font-size:8px}
+.mobile-honk{width:52px;height:52px}
+.mobile-park{width:100px;height:48px;font-size:17px}
+}
+@media(max-width:360px){
+ .pedal{width:78px;height:68px}
 }
 @media(max-height:480px){
  .mode-desc{display:none}
@@ -194,9 +237,6 @@ body[data-device="mobile"] .pickup-banner,body[data-device="tablet"] .pickup-ban
  .hud{top:calc(8px + var(--safe-top));left:calc(10px + var(--safe-left))}
  .objective{top:calc(10px + var(--safe-top));left:auto;right:calc(66px + var(--safe-right));transform:none;width:300px}
  .pickup-banner{top:calc(92px + var(--safe-top));left:auto;right:calc(66px + var(--safe-right));transform:none;width:300px}
- .pad{grid-template-columns:repeat(3,56px);grid-template-rows:56px 56px}
- .mobile-park{width:104px;height:80px}
- .mobile-honk{width:84px;height:44px;font-size:17px}
  .hero{padding:18px 22px}
  .hero h1{font-size:40px!important}
  #overlay.title .hero h1{font-size:56px!important}
@@ -304,6 +344,9 @@ body[data-device="mobile"][data-mode="rush"] .pickup-banner,body[data-device="ta
 /* Prevent mobile long-press selection while leaving pinch zoom available. */
 body{-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;-webkit-touch-callout:none;overscroll-behavior:none}
 .hero::-webkit-scrollbar{display:none}
+@media(min-width:901px){
+ body[data-mode=rush] .objective{top:calc(20px + var(--safe-top));left:auto;right:calc(148px + var(--safe-right));transform:none;width:auto;min-width:240px;max-width:min(420px,calc(100vw - 630px));text-align:left}
+}
 </style>
 <script type="importmap">{"imports":{"three":"./assets/three/three.module.js"}}</script>
 </head><body class="menu">
@@ -316,13 +359,21 @@ body{-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-se
 <div class="metric"><label>STRIKES</label><strong id="lives">♥♥♥</strong></div>
 </section>
 <div class="jar" aria-hidden="true"><i id="jarFill"></i><span id="jarLabel">TIP JAR $0 / $100</span></div>
-<div class="top-right"><div class="shift-chip"><span id="step">SHIFT 1</span><span class="bar"><i id="stepBar"></i></span></div><button class="sound" id="sound" aria-label="Toggle sound">♫</button></div>
+<div class="top-right"><div class="shift-chip"><span id="step">SHIFT 1</span><span class="bar"><i id="stepBar"></i></span></div><button class="fullscreen" id="fullscreenBtn" aria-label="Enter fullscreen" title="Enter fullscreen">⛶</button><button class="sound" id="sound" aria-label="Toggle sound">♫</button></div>
 
 <aside class="objective" id="brief" data-mode="arrival" aria-live="polite"><div class="objective-head"><span class="section-label">BRIEF</span></div><h2 id="objectiveTitle"></h2><div class="callout"><div class="call-icon"></div><div><div class="call-label" id="callLabel">NEXT ARRIVAL</div><div class="call-main" id="callMain">A guest is pulling in</div></div></div><p id="objectiveText"></p><div class="divider"></div></aside>
 <div class="pickup-banner" id="pickup"><div class="owner" id="ownerText">A guest is waiting</div><div class="plate" id="plateText">PLEASE RETURN THEIR CAR</div></div>
 
 <footer class="bottom"><div class="instruction"><span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span><span class="instruction-text">Drive</span><span class="key space">SPACE</span><span class="instruction-text">Park</span><span class="key">CLICK</span><span class="instruction-text">Return keys</span></div></footer>
-<div class="mobile-controls"><div class="pad"><button data-key="ArrowUp" aria-label="Forward">↑</button><button data-key="ArrowLeft" aria-label="Steer left">←</button><button data-key="ArrowDown" aria-label="Reverse">↓</button><button data-key="ArrowRight" aria-label="Steer right">→</button></div><div class="pad-right"><button class="mobile-honk" id="honkBtn" aria-label="Honk">HONK</button><button class="mobile-park" id="parkBtn">PARK</button></div></div>
+<div class="mobile-controls" id="mobileControls" data-state="hidden" aria-label="Touch controls">
+ <div class="left-control move-control" id="walkControl"><span class="control-label">MOVE</span><div class="joystick-base" id="walkStick" role="application" aria-label="Movement joystick"><span class="joystick-knob" id="walkKnob"></span></div></div>
+ <div class="left-control steering-group"><span class="control-label">STEER</span><div class="steer-control" id="steerControl" role="slider" aria-label="Steering" aria-valuemin="-100" aria-valuemax="100" aria-valuenow="0" tabindex="0"><span class="steering-wheel" id="steeringWheel"><span class="wheel-marker"></span><span class="steering-hub"></span></span></div></div>
+ <div class="pad-right">
+  <button class="mobile-honk" id="honkBtn" aria-label="Honk" title="Honk"><img src="./assets/ui/bullhorn.svg" alt=""></button>
+  <button class="mobile-park" id="parkBtn">ACTION</button>
+  <div class="drive-pedals"><button class="pedal" id="brakeBtn" aria-label="Brake and reverse"><span>▼</span><small>BRAKE / REV</small></button><button class="pedal gas" id="gasBtn" aria-label="Accelerate"><span>▲</span><small>GAS</small></button></div>
+ </div>
+</div>
 <div class="toast" id="toast" role="status"></div>
 
 <div class="overlay title" id="overlay"><div class="hero"><div class="hero-eyebrow">Nocturne Hotel · Valet Club</div><h1>Valet<br><em>Panic!</em></h1><p>Park the guests' cars, hand them back, and out-valet the rival.</p><div class="best-line" id="bestLine"></div><div class="profile" id="profileLine"></div><div class="modes"><div class="mode"><button class="play rush" id="startRush" disabled>Loading…</button><span class="mode-desc">DUEL · START HERE · BEAT THE RIVAL VALET, SHIFT BY SHIFT</span></div><div class="mode"><button class="play" id="start" disabled>Loading…</button><span class="mode-desc">MEMORY · park it, remember it, return the right car</span></div></div><div class="title-links"><button class="link" id="tutorialBtn" disabled>▶ How to play</button><button class="link" id="levelsBtn" disabled>📋 All shifts</button><button class="link" id="locker" disabled>🎒 Locker</button><button class="link" id="sceneLabBtn" disabled hidden>🧪 Scene lab</button><button class="link" id="logBtn" disabled hidden>📊 Copy playtest log</button></div><div class="hero-foot">WASD / arrows to move · run up to a car to hop in · Space to park</div></div></div>

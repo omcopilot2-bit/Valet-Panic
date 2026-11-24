@@ -1,6 +1,6 @@
 // Keyboard, mouse and touch input, plus peeking at parked cars.
 import { peekCar } from './cars.js';
-import { parkCar, retrieveCar } from './classic.js';
+import { canUseAction, parkCar, retrieveCar } from './classic.js';
 import { PEEK_DWELL } from './config.js';
 import { keyName } from './keymap.js';
 import { $, audio, camera, canvas, pointer, raycaster, ui } from './core.js';
@@ -8,10 +8,55 @@ import { bindTitle, setPaused } from './menus.js';
 import * as platform from './platform.js';
 import { honk } from './shifts-world.js';
 import { startRush, withAd } from './shifts.js';
-import { cars, G, keys, layout, rush } from './state.js';
+import { cars, G, keys, layout, rush, touchInput } from './state.js';
 
 // Peeking: mouse = hover for a moment, touch/pen = press and hold. A quick click/tap selects the car.
 let peekTimerId = 0, peekArmed = null, peekFired = false;
+let walkPointer = null, steerPointer = null, steerStartX = 0, steerStartValue = 0;
+const mobileControlsElement = $('#mobileControls');
+
+const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+
+function resetWalk() {
+  walkPointer = null;
+  touchInput.walkX = 0;
+  touchInput.walkY = 0;
+  const knob = $('#walkKnob');
+  if (knob) knob.style.transform = 'translate(0px, 0px)';
+}
+
+function resetSteering() {
+  steerPointer = null;
+  touchInput.steer = 0;
+  const wheel = $('#steeringWheel');
+  if (wheel) wheel.style.transform = 'rotate(0deg)';
+  const control = $('#steerControl');
+  if (control) control.setAttribute('aria-valuenow', '0');
+}
+
+function resetPedals() {
+  touchInput.gas = false;
+  touchInput.brake = false;
+  touchInput.brakeStoppedTime = 0;
+}
+
+export function updateMobileControls() {
+  const control = mobileControlsElement;
+  if (!control) return;
+
+  let state = 'hidden';
+  if (G.running && !G.paused && !rush.picking) {
+    if (G.mode === 'rush' && rush.pl) state = rush.pl.mode === 'foot' ? 'walking' : 'driving';
+    else if (G.mode === 'classic' && G.activeCar) state = 'driving';
+  }
+
+  if (control.dataset.state !== state) {
+    if (control.dataset.state === 'walking') resetWalk();
+    if (control.dataset.state === 'driving') { resetSteering(); resetPedals(); }
+    control.dataset.state = state;
+  }
+  control.classList.toggle('has-action', state !== 'hidden' && canUseAction());
+}
 
 function carAt(e) {
   const r = canvas.getBoundingClientRect();
@@ -93,7 +138,12 @@ export function addControls() {
     down.delete(e.code);
     heldAtEnd.delete(e.code);
   });
-  window.addEventListener('blur', () => keys.clear());
+  window.addEventListener('blur', () => {
+    keys.clear();
+    resetWalk();
+    resetSteering();
+    resetPedals();
+  });
   window.addEventListener('pointerdown', () => window.focus());   // keep keyboard focus when embedded in an iframe
 
   canvas.addEventListener('pointermove', (e) => {
@@ -121,12 +171,77 @@ export function addControls() {
   canvas.addEventListener('pointerup', release);
   canvas.addEventListener('pointercancel', release);
 
-  document.querySelectorAll('.mobile-controls').forEach((el) => el.addEventListener('contextmenu', (e) => e.preventDefault()));
-  document.querySelectorAll('.pad button').forEach((b) => {
-    const k = b.dataset.key;
-    b.addEventListener('pointerdown', (e) => { e.preventDefault(); b.setPointerCapture(e.pointerId); keys.add(k); });
-    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach((ev) => b.addEventListener(ev, () => keys.delete(k)));
+  const mobileControls = mobileControlsElement;
+  mobileControls.addEventListener('contextmenu', (e) => e.preventDefault());
+
+  const walkStick = $('#walkStick');
+  const walkKnob = $('#walkKnob');
+  const moveWithStick = (e) => {
+    if (walkPointer !== e.pointerId || mobileControls.dataset.state !== 'walking') return;
+    const rect = walkStick.getBoundingClientRect();
+    const radius = Math.max(1, (rect.width - walkKnob.offsetWidth) / 2 - 2);
+    let x = (e.clientX - (rect.left + rect.width / 2)) / radius;
+    let y = (e.clientY - (rect.top + rect.height / 2)) / radius;
+    const length = Math.hypot(x, y);
+    if (length > 1) { x /= length; y /= length; }
+    touchInput.walkX = x;
+    touchInput.walkY = y;
+    walkKnob.style.transform = `translate(${x * radius}px, ${y * radius}px)`;
+  };
+  walkStick.addEventListener('pointerdown', (e) => {
+    if (mobileControls.dataset.state !== 'walking') return;
+    e.preventDefault();
+    walkPointer = e.pointerId;
+    walkStick.setPointerCapture(e.pointerId);
+    moveWithStick(e);
   });
+  walkStick.addEventListener('pointermove', moveWithStick);
+  ['pointerup', 'pointercancel', 'lostpointercapture'].forEach((event) => {
+    walkStick.addEventListener(event, (e) => { if (walkPointer === e.pointerId) resetWalk(); });
+  });
+
+  const steerControl = $('#steerControl');
+  const steeringWheel = $('#steeringWheel');
+  const moveSteering = (e) => {
+    if (steerPointer !== e.pointerId || mobileControls.dataset.state !== 'driving') return;
+    const rect = steerControl.getBoundingClientRect();
+    touchInput.steer = clamp(steerStartValue - (e.clientX - steerStartX) / (rect.width * 0.34), -1, 1);
+    steeringWheel.style.transform = `rotate(${-touchInput.steer * 360}deg)`;
+    steerControl.setAttribute('aria-valuenow', String(Math.round(touchInput.steer * 100)));
+  };
+  steerControl.addEventListener('pointerdown', (e) => {
+    if (mobileControls.dataset.state !== 'driving') return;
+    e.preventDefault();
+    steerPointer = e.pointerId;
+    steerStartX = e.clientX;
+    steerStartValue = touchInput.steer;
+    steerControl.setPointerCapture(e.pointerId);
+    moveSteering(e);
+  });
+  steerControl.addEventListener('pointermove', moveSteering);
+  ['pointerup', 'pointercancel', 'lostpointercapture'].forEach((event) => {
+    steerControl.addEventListener(event, (e) => { if (steerPointer === e.pointerId) resetSteering(); });
+  });
+
+  const bindPedal = (button, pedal) => {
+    let pointerId = null;
+    const release = (e) => {
+      if (pointerId !== null && e.pointerId !== pointerId) return;
+      pointerId = null;
+      touchInput[pedal] = false;
+      if (pedal === 'brake') touchInput.brakeStoppedTime = 0;
+    };
+    button.addEventListener('pointerdown', (e) => {
+      if (mobileControls.dataset.state !== 'driving') return;
+      e.preventDefault();
+      pointerId = e.pointerId;
+      button.setPointerCapture(e.pointerId);
+      touchInput[pedal] = true;
+    });
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach((event) => button.addEventListener(event, release));
+  };
+  bindPedal($('#gasBtn'), 'gas');
+  bindPedal($('#brakeBtn'), 'brake');
   $('#parkBtn').addEventListener('pointerdown', (e) => { e.preventDefault(); parkCar(); });
   $('#honkBtn').addEventListener('pointerdown', (e) => { e.preventDefault(); honk(); });
 
@@ -138,6 +253,12 @@ export function addControls() {
     try { localStorage.setItem('valetMute', G.soundOn ? '0' : '1'); } catch (e) { /* ignore */ }
     audio.setEnabled(G.soundOn && !G.platformMuted);
   });
+
+  const fullscreenBtn = $('#fullscreenBtn');
+  fullscreenBtn.addEventListener('click', toggleFullscreen);
+  document.addEventListener('fullscreenchange', renderFullscreenButton);
+  document.addEventListener('webkitfullscreenchange', renderFullscreenButton);
+  renderFullscreenButton();
 }
 
 export function renderSoundButton() {
@@ -148,4 +269,56 @@ export function renderSoundButton() {
   ui.soundBtn.title = G.platformMuted ? 'Muted by platform settings' : enabled ? 'Mute sound' : 'Enable sound';
   ui.soundBtn.setAttribute('aria-label', G.platformMuted ? 'Sound muted by platform settings' : enabled ? 'Mute sound' : 'Enable sound');
   ui.soundBtn.setAttribute('aria-pressed', String(enabled));
+}
+
+function isFullscreen() {
+  return Boolean(document.fullscreenElement || document.webkitFullscreenElement);
+}
+
+function renderFullscreenButton() {
+  const button = $('#fullscreenBtn');
+  if (!button) return;
+  const active = isFullscreen();
+  button.textContent = active ? '×' : '⛶';
+  button.title = active ? 'Exit fullscreen' : 'Enter fullscreen';
+  button.setAttribute('aria-label', button.title);
+  button.setAttribute('aria-pressed', String(active));
+}
+
+async function toggleFullscreen() {
+  if (isFullscreen()) {
+    const exit = document.exitFullscreen || document.webkitExitFullscreen;
+    if (!exit) {
+      toast('This browser does not support exiting fullscreen from the game.');
+      return;
+    }
+    try { await exit.call(document); }
+    catch (error) {
+      console.warn('Fullscreen exit was denied by the browser.', error);
+      toast('The browser could not exit fullscreen. Use its fullscreen control.');
+    }
+    return;
+  }
+
+  const root = document.documentElement;
+  if (!root.requestFullscreen && !root.webkitRequestFullscreen) {
+    toast('Fullscreen is not supported in this browser.');
+    return;
+  }
+  try {
+    if (root.requestFullscreen) await root.requestFullscreen({ navigationUI: 'hide' });
+    else await root.webkitRequestFullscreen();
+  } catch (error) {
+    console.warn('Fullscreen request was denied by the browser.', error);
+    toast('Fullscreen was blocked. Try the browser fullscreen control.');
+    return;
+  }
+
+  if (matchMedia('(pointer: coarse)').matches && screen.orientation && screen.orientation.lock) {
+    try { await screen.orientation.lock('landscape'); }
+    catch (error) {
+      console.warn('Landscape orientation lock is unavailable.', error);
+      toast('Fullscreen is on. Rotate your phone to landscape for the full view.');
+    }
+  }
 }

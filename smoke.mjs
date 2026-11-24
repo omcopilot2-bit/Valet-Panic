@@ -1,9 +1,9 @@
 // Browser-free checks of the data and the pure logic: level definitions, unlock chain, XP curve, duel star thresholds,
 // save merging and every rival route. It does not play the game.   Run:  node tests/smoke.mjs
 import assert from 'node:assert/strict';
-import { angleDifference, BOUNDS, duelGoals, duelStars, HANDOFF, HANDOFF_ANGLE, HANDOFF_YAW, LEVELS, PARKED_HALF, PARKING_LAYOUTS, PARKING_TYPES, PARK_ANGLE, SLOT_LAYOUTS, SLOT_POSITIONS } from './config.js';
+import { angleDifference, BOUNDS, CONE_ALLEY_ROAD, duelGoals, duelStars, DROPOFF, HANDOFF, HANDOFF_ANGLE, HANDOFF_YAW, LEVELS, PARKED_HALF, PARKING_LAYOUTS, PARKING_TYPES, PARK_ANGLE, SLOT_LAYOUTS, SLOT_POSITIONS } from './config.js';
 import { ENGINE_PROFILES, engineRpm, gearForSpeed } from './audio.js';
-import { approachPoint, deliverRoute, footRoute, parkRoute } from './routes.js';
+import { approachPoint, coneAlleyArrivalRoute, coneAlleyExitRoute, deliverRoute, footRoute, parkRoute } from './routes.js';
 import { keyName } from './keymap.js';
 import { addXp, isLevelUnlocked, levelInfo, loadFromPlatform, recordLevel, save, xpToNext } from './progress.js';
 import { MODEL_FILES } from './config.js';
@@ -25,19 +25,21 @@ test('levels are numbered 1..N with sane fields', () => {
   LEVELS.forEach((lv, i) => {
     assert.equal(lv.id, i + 1);
     assert.ok(lv.secs > 0 && lv.guests > 0 && lv.diff >= 1, `shift ${lv.id}`);
-    assert.ok(lv.bays.length >= 2 && lv.bays.every((b) => b >= 0 && b < SLOT_POSITIONS.length), `bays of shift ${lv.id}`);
+    assert.deepEqual(lv.bays, SLOT_POSITIONS.map((_, bay) => bay), `all eight bays are available in shift ${lv.id}`);
     assert.ok(lv.grip > 0 && lv.grip <= 1, `grip of shift ${lv.id}`);
     assert.equal(lv.cart, null, `shift ${lv.id} has no luggage-cart obstruction`);
   });
-  assert.equal(new Set(LEVELS.map((lv) => lv.bays.join(','))).size, LEVELS.length, 'every shift has its own open-bay footprint');
   assert.equal(new Set(Object.values(PARKING_LAYOUTS).map((layout) => layout.map((p) => p.join(',')).join('|'))).size, LEVELS.length, 'every shift has its own physical stall arrangement');
   assert.ok(Object.values(PARKING_TYPES).some((kind) => kind.includes('60')), 'the campaign includes angled stalls');
   assert.ok(Object.values(PARKING_TYPES).some((kind) => kind.includes('island')), 'the campaign includes landscaped median layouts');
   for (const lv of LEVELS) {
     const layout = PARKING_LAYOUTS[lv.id];
     assert.equal(layout.length, SLOT_POSITIONS.length, `shift ${lv.id} has a centre for each stall`);
-    const placed = SLOT_POSITIONS.map(([x, z], i) => [x + layout[i][0], z + layout[i][1]]);
-    placed.forEach(([x, z]) => assert.ok(x > BOUNDS.minX + 2 && x < BOUNDS.maxX - 2 && z > BOUNDS.minZ + 1.5 && z < BOUNDS.maxZ - 3, `shift ${lv.id} stall remains on the lot`));
+    const pilot = SLOT_LAYOUTS[lv.id];
+    const placed = SLOT_POSITIONS.map(([x, z], i) => pilot
+      ? [pilot[i].x, pilot[i].z]
+      : [x + layout[i][0], z + layout[i][1]]);
+    placed.forEach(([x, z]) => assert.ok(x > BOUNDS.minX + 2 && x < BOUNDS.maxX - 2 && z > BOUNDS.minZ + 1.8 && z < BOUNDS.maxZ - 1.8, `shift ${lv.id} stall remains on the lot`));
     for (let a = 0; a < placed.length; a++) for (let b = a + 1; b < placed.length; b++) {
       assert.ok(Math.hypot(placed[a][0] - placed[b][0], placed[a][1] - placed[b][1]) > 3.6, `shift ${lv.id} stalls do not overlap`);
     }
@@ -103,11 +105,30 @@ test('pilot layouts have real bay positions and level-aware rival routes', () =>
   const casino = SLOT_LAYOUTS[3];
   assert.ok(casino.every((bay) => Math.hypot(bay.x, bay.z - 0.2) > 4.4),
     'casino bays keep clear of the centre fountain');
+  for (let a = 0; a < casino.length; a++) for (let b = a + 1; b < casino.length; b++) {
+    const first = casino[a], second = casino[b];
+    const dx = first.x - second.x, dz = first.z - second.z;
+    assert.ok(Math.hypot(dx, dz) >= 3.9, `casino bays ${a + 1} and ${b + 1} have practical bumper clearance`);
+  }
   const airport = SLOT_LAYOUTS[6];
   assert.ok(airport.slice(0, 4).every((bay) => bay.z <= -5),
     'airport top row uses a real rear kerb line');
   assert.ok(airport.slice(4).every((bay) => bay.z >= 5),
     'airport bottom row uses a real front kerb line');
+});
+
+test('Cone Alley arrivals and departures use the outside road loop', () => {
+  const arrival = coneAlleyArrivalRoute();
+  assert.deepEqual(arrival[0], { x: DROPOFF.x, z: CONE_ALLEY_ROAD.arrivalStartZ, yaw: 0 });
+  assert.equal(arrival[0].z, 8.2, 'arrivals begin at the lower-center approach shown in the scene, not on the frontage road');
+  assert.ok(arrival[0].z > DROPOFF.z, 'arrivals drive inward from the lower approach to the drop-off');
+  assert.deepEqual(arrival.at(-1), { x: DROPOFF.x, z: DROPOFF.z, yaw: 0 });
+
+  const exit = coneAlleyExitRoute();
+  assert.deepEqual(exit[0], { x: HANDOFF.x, z: CONE_ALLEY_ROAD.exitJoinZ });
+  assert.deepEqual(exit[1], { x: CONE_ALLEY_ROAD.rightX, z: CONE_ALLEY_ROAD.exitJoinZ });
+  assert.deepEqual(exit.at(-1), { x: CONE_ALLEY_ROAD.rightX, z: CONE_ALLEY_ROAD.exitZ });
+  assert.ok(exit.at(-1).z > exit[1].z, 'departing cars turn down the right-side road after joining it');
 });
 
 test('duel goals are strictly increasing and stars follow the margin', () => {

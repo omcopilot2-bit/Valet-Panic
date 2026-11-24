@@ -6,7 +6,7 @@ import { audio, gripOf, parkRadius, parkSpeed, parkYaw, toast } from './core.js'
 import { puff } from './fx.js';
 import { otherPeople } from './people.js';
 import { rushBump } from './shifts.js';
-import { cars, G, keys, rush, slots } from './state.js';
+import { cars, G, keys, rush, slots, touchInput } from './state.js';
 
 export function angleToBay(car) {
   return angleDifference(car.yaw, parkYaw(car.slot));
@@ -29,6 +29,7 @@ const wrapAngle = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 // The heading always turns smoothly: it never snaps.
 export function stepExit(car, dt) {
   let nextX = car.x, nextZ = car.z, nextYaw = car.yaw;
+  let routeComplete = false;
   if (car.exitRoute && car.exitRoute.length) {
     let i = car.exitRouteIndex || 0;
     let target = car.exitRoute[i];
@@ -48,6 +49,7 @@ export function stepExit(car, dt) {
     const step = 4.2 * (1 - turn * 0.35) * dt;
     nextX = d <= step ? target.x : car.x + dx / d * step;
     nextZ = d <= step ? target.z : car.z + dz / d * step;
+    routeComplete = i === car.exitRoute.length - 1 && d <= step;
   } else
   if (car.z < car.exitLane - 0.02) {
     // line the car up with the bay axis (nearest of 0 / PI), and only roll once it is roughly straight
@@ -77,7 +79,7 @@ export function stepExit(car, dt) {
   car.root.position.set(car.x, 0.045, car.z);
   car.root.rotation.y = car.yaw;
   if (car.x > 15) car.exitIgnoreFigure = null;
-  return car.x > 15;
+  return car.exitRoute && car.exitRoute.length ? routeComplete : car.x > 15;
 }
 
 export function stepSnap(dt) {
@@ -168,12 +170,12 @@ function resolveCollisions(car) {
 }
 
 export function drive(car, dt) {
-  const forward = keys.has('ArrowUp') || keys.has('w');
+  const forward = keys.has('ArrowUp') || keys.has('w') || touchInput.gas;
   const back = keys.has('ArrowDown') || keys.has('s');
   const left = keys.has('ArrowLeft') || keys.has('a');
   const right = keys.has('ArrowRight') || keys.has('d');
-  const throttle = (forward ? 1 : 0) - (back ? 1 : 0);
-  const steer = (left ? 1 : 0) - (right ? 1 : 0);
+  const digitalThrottle = (forward ? 1 : 0) - (back ? 1 : 0);
+  const steer = THREE.MathUtils.clamp((left ? 1 : 0) - (right ? 1 : 0) + touchInput.steer, -1, 1);
   const q = car.quirk;
   const fX = Math.sin(car.yaw), fZ = Math.cos(car.yaw);
   car.propGhostT = Math.max(0, (car.propGhostT || 0) - dt);
@@ -182,6 +184,11 @@ export function drive(car, dt) {
   const vmax = (nitro ? 6.2 : 4.4) * (car.special === 'vintage' ? 0.8 : 1);
 
   const fw0 = car.vx * fX + car.vz * fZ;
+  if (touchInput.brake && Math.abs(fw0) <= 0.3) touchInput.brakeStoppedTime += dt;
+  else touchInput.brakeStoppedTime = 0;
+  const throttle = touchInput.brake
+    ? (Math.abs(fw0) > 0.3 ? -Math.sign(fw0) : touchInput.brakeStoppedTime > 0.35 ? -1 : 0)
+    : digitalThrottle;
   const accel = throttle !== 0 && Math.sign(throttle) !== Math.sign(fw0) && Math.abs(fw0) > 0.3 ? 9 : (nitro ? 11 : 6);   // braking bites harder than accelerating
   car.vx += fX * throttle * accel * dt;
   car.vz += fZ * throttle * accel * dt;

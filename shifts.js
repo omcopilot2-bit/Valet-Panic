@@ -12,10 +12,11 @@ import { enterBuilding, guide, otherPeople, poof, pushFromPeople, removeFigure, 
 import * as platform from './platform.js';
 import { addXp, logRun, persist, recordLevel, save, submitScore } from './progress.js';
 import { applyLevelLayout, clearToken, closePerkPicker, collectToken, fireEvent, nearMiss, offerShiftIntro, spawnToken, tokenDelay, tokenTexture, updateLevelProps } from './shifts-world.js';
-import { cars, G, hooks, keys, newRushStats, resetPerks, rivalScore, rush, slots, tut, tutorial } from './state.js';
+import { cars, G, hooks, keys, newRushStats, resetPerks, rivalScore, rush, slots, touchInput, tut, tutorial } from './state.js';
 import { newRival, stepRivalCar, updateRival } from './rival.js';
 import { updateRushHUD } from './hud.js';
 import { showShiftResults } from './results.js';
+import { coneAlleyArrivalRoute, coneAlleyExitRoute } from './routes.js';
 
 const rushDrain = () => (1 / Math.max(6, 11 - (rush.level - 1) * 0.5)) * (1 - 0.2 * rush.perks.combo);   // meter empties in 7s, shrinking to 3.5s
 
@@ -214,7 +215,12 @@ function rushSpawn() {
   car.arriving = true;
   rush.inbound = car;
   rush.arrived++;
-  placeCar(car, -16.3, DROPOFF.z, Math.PI / 2);
+  if (rush.lv.id === 4) {
+    car.arrivalRoute = coneAlleyArrivalRoute();
+    car.arrivalRouteIndex = 0;
+    car.exitRoute = coneAlleyExitRoute();
+    placeCar(car, car.arrivalRoute[0].x, car.arrivalRoute[0].z, car.arrivalRoute[0].yaw);
+  } else placeCar(car, -16.3, DROPOFF.z, Math.PI / 2);
   const rest = free.filter((s) => s !== slot);
   rush.nextSlot = rest.length && rush.arrived < rush.guestTotal ? rest[Math.floor(Math.random() * rest.length)] : null;
   if (tutorial.on) tutorial.spawned = true;
@@ -368,8 +374,8 @@ const carCircleDist = (car, x, z) => {
 function updateFoot(dt) {
   const pl = rush.pl;
   if (!pl || pl.mode !== 'foot') { rush.near = null; rush.enterT = 0; guide.visible = false; return; }
-  const kx = (keys.has('ArrowRight') || keys.has('d') ? 1 : 0) - (keys.has('ArrowLeft') || keys.has('a') ? 1 : 0);
-  const kz = (keys.has('ArrowDown') || keys.has('s') ? 1 : 0) - (keys.has('ArrowUp') || keys.has('w') ? 1 : 0);
+  const kx = THREE.MathUtils.clamp((keys.has('ArrowRight') || keys.has('d') ? 1 : 0) - (keys.has('ArrowLeft') || keys.has('a') ? 1 : 0) + touchInput.walkX, -1, 1);
+  const kz = THREE.MathUtils.clamp((keys.has('ArrowDown') || keys.has('s') ? 1 : 0) - (keys.has('ArrowUp') || keys.has('w') ? 1 : 0) + touchInput.walkY, -1, 1);
   const len = Math.hypot(kx, kz);
   const sp = (rush.nitro > 0 ? 7 : 4.8) * (rush.coffee > 0 ? 1.35 : 1) * (1 + 0.12 * rush.perks.legs);
   if (len > 0) {
@@ -497,24 +503,51 @@ function enterCar(car) {
 
 // The guest's car pulls up to the drop-off on its own; the guest steps out and heads into the lobby.
 function stepArrive(c, dt) {
-  const remain = DROPOFF.x - c.x;
-  const sp = Math.min(5, 0.8 + remain * 1.6);
-  const nextX = Math.min(DROPOFF.x, c.x + sp * dt);
+  let nextX, nextZ, nextYaw = c.yaw, arrived;
+  if (c.arrivalRoute && c.arrivalRoute.length) {
+    let i = c.arrivalRouteIndex || 0;
+    let target = c.arrivalRoute[i];
+    let dx = target.x - c.x, dz = target.z - c.z;
+    let distance = Math.hypot(dx, dz);
+    if (distance < 0.28 && i < c.arrivalRoute.length - 1) {
+      target = c.arrivalRoute[++i];
+      c.arrivalRouteIndex = i;
+      dx = target.x - c.x;
+      dz = target.z - c.z;
+      distance = Math.hypot(dx, dz);
+    }
+    const want = target.yaw !== undefined ? target.yaw : distance > 0.05 ? Math.atan2(dx, dz) : c.yaw;
+    const diff = Math.atan2(Math.sin(want - c.yaw), Math.cos(want - c.yaw));
+    nextYaw += Math.max(-3 * dt, Math.min(3 * dt, diff));
+    const step = Math.min(distance, Math.min(5, 0.8 + distance * 1.6) * dt);
+    nextX = distance <= step ? target.x : c.x + dx / distance * step;
+    nextZ = distance <= step ? target.z : c.z + dz / distance * step;
+    arrived = i === c.arrivalRoute.length - 1 && distance <= step;
+  } else {
+    const remain = DROPOFF.x - c.x;
+    const step = Math.min(5, 0.8 + remain * 1.6) * dt;
+    nextX = Math.min(DROPOFF.x, c.x + step);
+    nextZ = c.z;
+    arrived = nextX >= DROPOFF.x - 0.02;
+  }
   const peopleWithRightOfWay = otherPeople(null).filter((p) => p.fig?.role === 'valet' || p.fig?.role === 'rival');
-  if (carPathBlocked(c, nextX, c.z, c.yaw, cars, 0.08)
-    || carPathHitsCircle(c, nextX, c.z, c.yaw, [...G.colliders, ...peopleWithRightOfWay], 0.02)) {
+  if (carPathBlocked(c, nextX, nextZ, nextYaw, cars, 0.08)
+    || carPathHitsCircle(c, nextX, nextZ, nextYaw, [...G.colliders, ...peopleWithRightOfWay], 0.02)) {
     c.speed = c.vx = c.vz = 0;                 // arrivals wait for active valet traffic to clear (but not forever)
     c.blockT = (c.blockT || 0) + dt;
     if (c.blockT < 2.5) return;
   } else c.blockT = 0;
-  const oldX = c.x;
-  c.x = nextX;
+  const oldX = c.x, oldZ = c.z;
+  c.x = nextX; c.z = nextZ; c.yaw = nextYaw;
   c.vx = dt > 0 ? (nextX - oldX) / dt : 0;
-  c.vz = 0;
-  c.speed = Math.abs(c.vx);
+  c.vz = dt > 0 ? (nextZ - oldZ) / dt : 0;
+  c.speed = Math.hypot(c.vx, c.vz);
   c.root.position.set(c.x, 0.045, c.z);
-  if (c.x < DROPOFF.x - 0.02) return;
+  c.root.rotation.y = c.yaw;
+  if (!arrived) return;
   c.arriving = false;
+  c.arrivalRoute = null;
+  c.arrivalRouteIndex = 0;
   c.speed = c.vx = c.vz = 0;
   rush.inbound = null;
   rush.waiting = c;
@@ -615,13 +648,26 @@ function updateCalls(dt) {
 
 // Space bar while delivering: hand over instantly if you are inside the ring and slow enough.
 export function tryHandoff() {
-  const car = G.activeCar, call = car && car.call;
-  if (!call || call.state !== 'driving') return;
-  const d = Math.hypot(car.x - HANDOFF.x, car.z - HANDOFF.z);
-  if (d > parkRadius()) { toast('Drive into the green PICK-UP ring first.'); return; }
-  if (car.speed > parkSpeed()) { toast('Ease off the throttle before you hand over.'); return; }
-  if (angleDifference(car.yaw, HANDOFF_YAW) > HANDOFF_ANGLE) { toast('Line the car up facing the PICK-UP curb before hand-over.'); return; }
+  const status = handoffStatus();
+  if (status === 'none') return;
+  if (status === 'distance') { toast('Drive into the green PICK-UP ring first.'); return; }
+  if (status === 'speed') { toast('Ease off the throttle before you hand over.'); return; }
+  if (status === 'alignment') { toast('Line the car up facing the PICK-UP curb before hand-over.'); return; }
   deliverCar();
+}
+
+export function canHandoff() {
+  return handoffStatus() === 'ready';
+}
+
+function handoffStatus() {
+  const car = G.activeCar, call = car && car.call;
+  if (!call || call.state !== 'driving') return 'none';
+  const d = Math.hypot(car.x - HANDOFF.x, car.z - HANDOFF.z);
+  if (d > parkRadius()) return 'distance';
+  if (car.speed > parkSpeed()) return 'speed';
+  if (angleDifference(car.yaw, HANDOFF_YAW) > HANDOFF_ANGLE) return 'alignment';
+  return 'ready';
 }
 
 function deliverCar() {
@@ -828,7 +874,8 @@ export function updateRush(dt) {
       if (c.handoffT <= 0) {
         // Clear the curb before taking the front exit lane.
         c.leaving = true; c.exit = true; c.exitLane = EXIT_LANE_FRONT;
-        c.exitRoute = c.slot && c.slot.exitRoute ? c.slot.exitRoute : undefined;
+        c.exitRoute = rush.lv.id === 4 ? coneAlleyExitRoute()
+          : c.slot && c.slot.exitRoute ? c.slot.exitRoute : undefined;
         c.exitRouteIndex = 0;
       }
     } else if (c.parked && c.leaveIn !== undefined && !c.snap && !c.called) {

@@ -10,6 +10,7 @@ export const JAR_SIZE = 100;           // tips per tip-jar fill
 export const JAR_BONUS = 10;
 export const BOUNDS = { minX: -14.25, maxX: 14.25, minZ: -7.6, maxZ: 8.4 };
 export const SPAWN = { x: -9.6, z: 6.5, yaw: Math.PI / 2 };
+export const CONE_ALLEY_ROAD = { rightX: 16.35, arrivalStartZ: 8.2, exitJoinZ: 8.8, exitZ: 15.5 };
 export const EXIT_LANE_BACK = -1.72;   // gap between the two bay rows
 export const EXIT_LANE_FRONT = 7.6;    // clear the planter and front curb before turning out
 // Bay centres [x, z]: the back row (z < 0) then the front row.
@@ -34,7 +35,7 @@ export const PARKING_LAYOUTS = {
 // Stall/aisle archetypes. `oblique` uses paired 60-degree banks; `island` adds a planted median
 // in the centre aisle; the remaining shifts use 90-degree rows with different spacing and bay masks.
 export const PARKING_TYPES = {
-  1: '90', 2: '90-staggered', 3: '60-oblique', 4: '90-island', 5: '60-oblique',
+  1: '90', 2: '90-staggered', 3: '90-roundabout', 4: '90-island', 5: '60-oblique',
   6: '90-island', 7: '90-compact', 8: '90-gala-island', 9: '60-island', 10: '60-finale-island',
 };
 
@@ -42,14 +43,14 @@ export const PARKING_TYPES = {
 // SLOT_POSITIONS and bay masks stay unchanged, so scoring and unlocks need no migration.
 export const SLOT_LAYOUTS = {
   3: [
-    { x: -10.2, z: -4.8, yaw: Math.PI * 0.5 },
-    { x: -5.8, z: -5.3, yaw: Math.PI * 0.75 },
-    { x: 5.8, z: -5.3, yaw: Math.PI * 1.25 },
-    { x: 10.2, z: -4.8, yaw: Math.PI * 1.5 },
-    { x: -10.2, z: 3.8, yaw: Math.PI * 0.5 },
-    { x: -5.8, z: 5.1, yaw: Math.PI * 0.25 },
-    { x: 5.8, z: 5.1, yaw: Math.PI * 1.75 },
-    { x: 10.2, z: 3.8, yaw: Math.PI * 1.5 },
+    { x: -10, z: -5, yaw: 0 },
+    { x: -5, z: -5, yaw: 0 },
+    { x: 5, z: -5, yaw: 0 },
+    { x: 10, z: -5, yaw: 0 },
+    { x: -6, z: 5, yaw: Math.PI },
+    { x: -2, z: 5, yaw: Math.PI },
+    { x: 2, z: 5, yaw: Math.PI },
+    { x: 6, z: 5, yaw: Math.PI },
   ],
   5: [
     { x: -9.8, z: -4.8, yaw: Math.PI * 0.5 },
@@ -122,33 +123,33 @@ export const RUSH_PERKS = [
      secs        time limit in seconds (finishing early adds a bonus)            stars   tips needed for 1 / 2 / 3 stars
      diff        1..10 pacing (patience, drain, key wait)
      calls       guests that may wait at the curb at once, from `callsFrom` seconds in
-     bays        indexes (0-3 top row, 4-7 bottom row) of the bays that are open; the rest are closed
+     bays        indexes (0-3 top row, 4-7 bottom row) of bays available in this shift
      park        'nose' (drive in) or 'reverse' (back in: the nose must face out)
      grip        1 = normal tyres, lower = slippery      ringScale / speedScale  < 1 makes parking harder
      vipRate     chance a car is a VIP    quirks  which quirk cars may appear    gap  seconds between arrivals
    `stars` (tip goals) are no longer used for the star rating: stars come from beating the rival (see duelGoals).
    The rival speeds and the duel goals are first estimates: tune them after playtests. */
 export const LEVELS = [
-  { id: 1, name: 'Welcome Shift', tagline: 'Four bays, wide rings, no surprises.', secs: 210, guests: 10, stars: [180, 260, 350], diff: 1, calls: 1, callsFrom: 5,
-    bays: [1, 2, 5, 6], park: 'nose', grip: 1, ringScale: 1.2, speedScale: 1.1, cones: [], cart: null, vipRate: 0, quirks: [], gap: 0.8 },
-  { id: 2, name: 'Lunch Rush', tagline: 'Staggered 90-degree rows leave a clear curb route.', secs: 240, guests: 11, stars: [210, 310, 420], diff: 2, calls: 1, callsFrom: 10,
-    bays: [0, 1, 2, 4, 5, 6], park: 'nose', grip: 1, ringScale: 1, speedScale: 1, cones: [], cart: null, vipRate: 0, quirks: [], gap: 0.5 },
-  { id: 3, name: 'Casino Roundabout', tagline: 'Reverse around the fountain and between angled bays.', secs: 240, guests: 11, stars: [210, 310, 420], diff: 3, calls: 1, callsFrom: 10,
-    bays: [0, 2, 4, 6], park: 'reverse', grip: 1, ringScale: 1.1, speedScale: 1, cones: [], cart: null, vipRate: 0, quirks: [], gap: 0.5 },
+  { id: 1, name: 'Welcome Shift', tagline: 'Eight bays, wide rings, no surprises.', secs: 210, guests: 10, stars: [180, 260, 350], diff: 1, calls: 1, callsFrom: 5,
+    bays: [0, 1, 2, 3, 4, 5, 6, 7], park: 'nose', grip: 1, ringScale: 1.2, speedScale: 1.1, cones: [], cart: null, vipRate: 0, quirks: [], gap: 0.8 },
+  { id: 2, name: 'Lunch Rush', tagline: 'All eight bays open in staggered 90-degree rows.', secs: 240, guests: 11, stars: [210, 310, 420], diff: 2, calls: 1, callsFrom: 10,
+    bays: [0, 1, 2, 3, 4, 5, 6, 7], park: 'nose', grip: 1, ringScale: 1, speedScale: 1, cones: [], cart: null, vipRate: 0, quirks: [], gap: 0.5 },
+  { id: 3, name: 'Casino Roundabout', tagline: 'Reverse into eight clear bays around a central fountain.', secs: 240, guests: 11, stars: [210, 310, 420], diff: 3, calls: 1, callsFrom: 10,
+    bays: [0, 1, 2, 3, 4, 5, 6, 7], park: 'reverse', grip: 1, ringScale: 1.1, speedScale: 1, cones: [], cart: null, vipRate: 0, quirks: [], gap: 0.5 },
   { id: 4, name: 'Cone Alley', tagline: 'Work around the planted median and traffic cones.', secs: 275, guests: 13, stars: [240, 360, 490], diff: 4, calls: 2, callsFrom: 10,
-    bays: [0, 2, 4, 5, 7], park: 'nose', grip: 1, ringScale: 1, speedScale: 1, cones: [[-6.5, 5.0], [-3, 6.6], [0.5, 5.0], [4, 6.6]], cart: null, vipRate: 0.1, quirks: ['brakes'], gap: 0.4 },
+    bays: [0, 1, 2, 3, 4, 5, 6, 7], park: 'nose', grip: 1, ringScale: 1, speedScale: 1, cones: [[-7.2, 5.0], [-2.5, 6.6], [2.2, 5.0], [6.9, 6.6]], cart: null, vipRate: 0.1, quirks: ['brakes'], gap: 0.4 },
   { id: 5, name: 'Opera Red Carpet', tagline: 'Flank the red carpet through two angled bay columns.', secs: 275, guests: 13, stars: [240, 360, 490], diff: 5, calls: 2, callsFrom: 8,
-    bays: [0, 1, 2, 3], park: 'nose', grip: 0.45, ringScale: 1.1, speedScale: 1, cones: [], cart: null, vipRate: 0.1, quirks: ['brakes', 'wide'], gap: 0.4 },
+    bays: [0, 1, 2, 3, 4, 5, 6, 7], park: 'nose', grip: 0.45, ringScale: 1.1, speedScale: 1, cones: [], cart: null, vipRate: 0.1, quirks: ['brakes', 'wide'], gap: 0.4 },
   { id: 6, name: 'Terminal Run', tagline: 'Work curb-side bays along both edges of the terminal.', secs: 305, guests: 15, stars: [280, 420, 560], diff: 6, calls: 2, callsFrom: 8,
-    bays: [4, 5, 6, 7], park: 'nose', grip: 1, ringScale: 1, speedScale: 1, cones: [], cart: null, vipRate: 0.1, quirks: ['wide'], gap: 0.4 },
-  { id: 7, name: 'Tight Squeeze', tagline: 'Only four bays open and the rings are tiny.', secs: 240, guests: 11, stars: [210, 310, 420], diff: 7, calls: 2, callsFrom: 8,
-    bays: [0, 2, 5, 7], park: 'nose', grip: 1, ringScale: 0.72, speedScale: 0.8, cones: [], cart: null, vipRate: 0.15, quirks: ['brakes', 'wide'], gap: 0.3 },
+    bays: [0, 1, 2, 3, 4, 5, 6, 7], park: 'nose', grip: 1, ringScale: 1, speedScale: 1, cones: [], cart: null, vipRate: 0.1, quirks: ['wide'], gap: 0.4 },
+  { id: 7, name: 'Tight Squeeze', tagline: 'Tiny rings demand careful parking across all eight bays.', secs: 240, guests: 11, stars: [210, 310, 420], diff: 7, calls: 2, callsFrom: 8,
+    bays: [0, 1, 2, 3, 4, 5, 6, 7], park: 'nose', grip: 1, ringScale: 0.72, speedScale: 0.8, cones: [], cart: null, vipRate: 0.15, quirks: ['brakes', 'wide'], gap: 0.3 },
   { id: 8, name: 'VIP Gala', tagline: 'Half the guests are VIPs: park them fast for double tips.', secs: 305, guests: 15, stars: [280, 420, 560], diff: 8, calls: 2, callsFrom: 8,
-    bays: [1, 3, 4, 6, 7], park: 'nose', grip: 1, ringScale: 1, speedScale: 1, cones: [], cart: null, vipRate: 0.5, quirks: ['leaky', 'horn'], gap: 0.3 },
+    bays: [0, 1, 2, 3, 4, 5, 6, 7], park: 'nose', grip: 1, ringScale: 1, speedScale: 1, cones: [], cart: null, vipRate: 0.5, quirks: ['leaky', 'horn'], gap: 0.3 },
   { id: 9, name: 'Valet Storm', tagline: '60-degree stalls, slick lanes and a planted island.', secs: 340, guests: 17, stars: [320, 470, 630], diff: 9, calls: 3, callsFrom: 6,
-    bays: [0, 1, 3, 4, 6], park: 'nose', grip: 0.6, ringScale: 1, speedScale: 1, cones: [[-5, 5.0], [1, 6.6]], cart: null, vipRate: 0.2, quirks: ['brakes', 'wide', 'leaky', 'horn'], gap: 0.3 },
-  { id: 10, name: 'Midnight Finale', tagline: 'Reverse into angled bays around the garden median.', secs: 370, guests: 19, stars: [350, 520, 700], diff: 10, calls: 3, callsFrom: 6,
-    bays: [0, 2, 3, 5, 6, 7], park: 'reverse', grip: 1, ringScale: 0.9, speedScale: 0.9, cones: [], cart: null, vipRate: 0.35, quirks: ['brakes', 'wide', 'leaky', 'horn'], gap: 0.25 },
+    bays: [0, 1, 2, 3, 4, 5, 6, 7], park: 'nose', grip: 0.6, ringScale: 1, speedScale: 1, cones: [[-5, 5.0], [1, 6.6]], cart: null, vipRate: 0.2, quirks: ['brakes', 'wide', 'leaky', 'horn'], gap: 0.3 },
+  { id: 10, name: 'Midnight Finale', tagline: 'Reverse park around the rooftop garden beneath the midnight skyline.', secs: 370, guests: 19, stars: [350, 520, 700], diff: 10, calls: 3, callsFrom: 6,
+    bays: [0, 1, 2, 3, 4, 5, 6, 7], park: 'reverse', grip: 1, ringScale: 0.9, speedScale: 0.9, cones: [], cart: null, vipRate: 0.35, quirks: ['brakes', 'wide', 'leaky', 'horn'], gap: 0.25 },
 ];
 
 // Rival duel: you win a shift by parking and returning MORE cars than the AI rival valet (1 star).

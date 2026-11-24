@@ -9,7 +9,7 @@ import { arrivalGuest, valetHop } from './people.js';
 import * as platform from './platform.js';
 import { addXp, persist, save } from './progress.js';
 import { applyLevelLayout } from './shifts-world.js';
-import { playerExit, rushInteract, rushParked, tryHandoff } from './shifts.js';
+import { canHandoff, playerExit, rushInteract, rushParked, tryHandoff } from './shifts.js';
 import { updateRushHUD } from './hud.js';
 import { cars, G, keys, perks, resetPerks, rush, slots, tut, tutorial } from './state.js';
 
@@ -108,6 +108,19 @@ export function parkCar() {
   popScore(`+ $${tip}`, s.x, s.y);
   if (perfect) { confetti(bay.x, bay.z); audio.play('perfect'); }
   else audio.play('good');
+}
+
+export function canUseAction() {
+  if (!G.running || G.paused || rush.picking) return false;
+  if (G.mode === 'rush' && rush.pl && rush.pl.mode === 'foot') return Boolean(rush.near);
+  const car = G.activeCar;
+  if (!car || G.phase !== 'arrival') return false;
+  if (car.delivering) return canHandoff();
+  const bay = car.slot;
+  return Boolean(bay)
+    && Math.hypot(car.x - bay.x, car.z - bay.z) <= parkRadius()
+    && Math.abs(car.speed) <= parkSpeed()
+    && angleToBay(car) <= PARK_ANGLE;
 }
 
 export function callPickup() {

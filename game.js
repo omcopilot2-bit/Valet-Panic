@@ -5,7 +5,7 @@ import { parkCar, start, updateClassic, updateHUD } from './classic.js';
 import { LEVELS, reduceMotion } from './config.js';
 import { addFx, audio, camera, clock, markAllSlots, renderer, scene, toast } from './core.js';
 import { animateCars, updateFx } from './fx.js';
-import { addControls, renderSoundButton } from './input.js';
+import { addControls, renderSoundButton, updateMobileControls } from './input.js';
 import { addPauseUI, applyCosmetics, setTitleButtons, showLevelSelect, showSceneLab, showTitle, updateBestLine } from './menus.js';
 import { updateFigures } from './people.js';
 import * as platform from './platform.js';
@@ -19,6 +19,8 @@ const platformExpected = platform.shouldLoadSDK();
 const platformReady = platform.initPlatform();
 let saveReady = !platformExpected;
 let assetsReady = false;
+let cameraFocus = { x: 0, z: -1.7 };
+let cameraUsesPortraitFollow = false;
 
 function applyLoadedSave() {
   G.best = save.best;
@@ -49,12 +51,40 @@ function update(dt) {
     markAllSlots(false);
   }
 
-  // Fixed camera: position and angle never change (the frustum is fitted to the screen in resize()). Only screen shake moves it.
-  camera.position.x = 0;
+  updateMobileControls();
+  const portrait = innerWidth / innerHeight < 0.9 && (G.mode === 'rush' || Boolean(G.activeCar));
+  if (portrait !== cameraUsesPortraitFollow) {
+    cameraUsesPortraitFollow = portrait;
+    resize();
+  }
+  if (portrait) {
+    let target = null;
+    if (G.running && G.mode === 'rush' && rush.pl) {
+      target = rush.pl.mode === 'drive' && G.activeCar ? G.activeCar : rush.pl;
+    } else if (G.running && G.activeCar) target = G.activeCar;
+    const targetX = target ? target.x : 0;
+    const targetZ = target ? target.z : -1.7;
+    const blend = 1 - Math.exp(-dt * 5);
+    cameraFocus.x += (targetX - cameraFocus.x) * blend;
+    cameraFocus.z += (targetZ - cameraFocus.z) * blend;
+  } else {
+    cameraFocus.x = 0;
+    cameraFocus.z = -1.7;
+  }
+
+  let cameraShake = 0;
   if (G.shake > 0) {
-    camera.position.x += (Math.random() - 0.5) * G.shake * 0.7;
+    cameraShake = (Math.random() - 0.5) * G.shake * 0.7;
     G.shake = Math.max(0, G.shake - dt * 1.6);
   }
+  if (portrait) {
+    camera.position.set(cameraFocus.x + cameraShake, 25, cameraFocus.z + 20.7);
+    camera.lookAt(cameraFocus.x, 0, cameraFocus.z);
+  } else {
+    camera.position.set(cameraShake, 25, 19);
+    camera.lookAt(0, 0, -1.7);
+  }
+  camera.updateMatrixWorld(true);
   if (G.wrongFlash > 0) G.wrongFlash = Math.max(0, G.wrongFlash - dt * 2.5);
   if (G.punch > 0) {
     G.punch = Math.max(0, G.punch - dt * 3.5);
@@ -104,12 +134,15 @@ for (const x of [-16.5, 16.5]) {
   FIT_POINTS.push(new THREE.Vector3(x, 3, -10.2), new THREE.Vector3(x, 0, -10.2), new THREE.Vector3(x, 0, 9.9));
 }
 
-// Fixed camera, any screen: the camera never moves; the orthographic frustum is fitted so every FIT_POINT is on screen.
+// Landscape shows the whole lot; portrait keeps the landscape scale and follows the active valet/car instead of shrinking the scene.
 function resize() {
   const W = innerWidth, H = innerHeight, aspect = W / H;
+  const portrait = aspect < 0.9 && (G.mode === 'rush' || Boolean(G.activeCar));
+  cameraUsesPortraitFollow = portrait;
   renderer.setSize(W, H, false);
-  camera.position.set(0, 25, 19);
-  camera.lookAt(0, 0, -1.7);
+  if (!portrait) cameraFocus = { x: 0, z: -1.7 };
+  camera.position.set(portrait ? cameraFocus.x : 0, 25, portrait ? cameraFocus.z + 20.7 : 19);
+  camera.lookAt(portrait ? cameraFocus.x : 0, 0, portrait ? cameraFocus.z : -1.7);
   camera.updateMatrixWorld(true);
 
   // Extents of the play area in camera space (x = screen right, y = screen up).
@@ -123,17 +156,21 @@ function resize() {
 
   // Breathing room in pixels: a little at the top, more at the bottom on touch layouts (on-screen controls).
   const padTop = Math.min(H * 0.05, 40);
-  const padBot = W <= 900 ? Math.min(H * 0.16, 110) : Math.min(H * 0.04, 30);
+  const padBot = portrait ? Math.min(H * 0.2, 170) : W <= 900 ? Math.min(H * 0.16, 110) : Math.min(H * 0.04, 30);
   const pf = Math.min(0.5, (padTop + padBot) / H);
+  const landscapePad = (Math.min(H * 0.05, 40) + Math.min(H * 0.04, 30)) / H;
+  const landscapeScale = Math.max(spanY / (1 - landscapePad), spanX / (16 / 9));
 
-  const visibleH = Math.max(spanY / (1 - pf), spanX / aspect);   // whichever dimension is tighter decides the zoom
+  const visibleH = portrait ? landscapeScale : Math.max(spanY / (1 - pf), spanX / aspect);
   const visibleW = visibleH * aspect;
   const cx = (minX + maxX) / 2;
   const cy = (minY + maxY) / 2 + (padTop - padBot) / 2 / H * visibleH;
-  camera.left = cx - visibleW / 2;
-  camera.right = cx + visibleW / 2;
-  camera.top = cy + visibleH / 2;
-  camera.bottom = cy - visibleH / 2;
+  const centerX = portrait ? 0 : cx;
+  const centerY = portrait ? (padTop - padBot) / 2 / H * visibleH : cy;
+  camera.left = centerX - visibleW / 2;
+  camera.right = centerX + visibleW / 2;
+  camera.top = centerY + visibleH / 2;
+  camera.bottom = centerY - visibleH / 2;
   camera.updateProjectionMatrix();
 }
 
@@ -255,6 +292,10 @@ updateBestLine();
 updateHUD();
 
 window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', resize);
+document.addEventListener('fullscreenchange', resize);
+document.addEventListener('webkitfullscreenchange', resize);
+if (window.visualViewport) window.visualViewport.addEventListener('resize', resize);
 
 preload()
   .then(() => {

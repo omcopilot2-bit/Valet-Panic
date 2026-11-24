@@ -1,9 +1,9 @@
 // Venues: every shift is set in a different place. A venue restyles the lighting, sky, lot surface and backdrop.
-// The bay layout, lanes, rings and rival routes are shared by all venues (collisions and routes.js depend on them),
-// so a venue is dressing around the same playfield. Tall pieces (towers, cranes, mountains) only show on tall / portrait screens,
+// Most venues share the same playfield; the pilot shifts override bay positions and headings in config.js.
+// Tall pieces (towers, mountains) only show on tall / portrait screens,
 // because the camera looks down at the lot; the low strip behind the top row, the lot surface and the lighting carry the look everywhere.
 import * as THREE from 'three';
-import { DOOR } from './config.js';
+import { CONE_ALLEY_ROAD, DOOR } from './config.js';
 import { loader, renderer, scene } from './core.js';
 import { addTextTexture, mat, rig, shell, surf } from './world.js';
 
@@ -14,28 +14,28 @@ const VENUES = {
     lights: [[0xeab96d, 38], [0xf3cb7a, 15], [0x57a5b1, 12]], ground: 0x0f2431, asphalt: { color: 0x35616f, rough: 0.45, metal: 0.12, tex: null } },
   2: { name: 'Seaside Resort', shell: false, bg: '#8fd6f2', fog: ['#bfe9f7', 0.005], exposure: 1.05, hemi: [0xffffff, 0xd9c79a, 2.3], moon: [0xfff0d0, 3.0, [-10, 24, 10]],
     lights: [[0xffffff, 0], [0xffffff, 0], [0xffffff, 0]], ground: 0xe3cf9c, asphalt: { color: 0xffffff, rough: 0.8, metal: 0, tex: 'paver' } },
-  3: { name: 'Neon Strip Casino', shell: false, bg: '#3a1a64', fog: ['#3a1a64', 0.006], exposure: 1.6, hemi: [0xd4c4ff, 0x6a4a96, 2.6], moon: [0xc8b8ff, 2.6, [-12, 22, 12]],
-    lights: [[0xff3da8, 40], [0x38e8ff, 22], [0xa060ff, 18]], ground: 0x3a2260, asphalt: { color: 0xffffff, rough: 0.3, metal: 0.3, tex: 'neon' } },
+  3: { name: 'Neon Strip Casino', shell: false, bg: '#21172f', fog: ['#21172f', 0.005], exposure: 1.28, hemi: [0xd4c4ff, 0x393246, 2.15], moon: [0xc8b8ff, 2.2, [-12, 22, 12]],
+    lights: [[0xff3da8, 26], [0x38e8ff, 15], [0xa060ff, 12]], ground: 0x211c2b, asphalt: { color: 0xffffff, rough: 0.72, metal: 0.08, tex: 'casino' } },
   4: { name: 'Building Site', shell: false, bg: '#e9a86a', fog: ['#d9a066', 0.009], exposure: 1.15, hemi: [0xffe3b8, 0x6a5030, 2.1], moon: [0xffc27a, 2.8, [14, 14, 10]],
-    lights: [[0xffb060, 10], [0xffffff, 0], [0xffffff, 0]], ground: 0x8a7048, asphalt: { color: 0xffffff, rough: 0.95, metal: 0, tex: 'dirt' } },
+    lights: [[0xffb060, 10], [0xffffff, 0], [0xffffff, 0]], ground: 0x696b68, asphalt: { color: 0xe7e2d7, rough: 0.98, metal: 0, tex: 'concrete' } },
   5: { name: 'Grand Opera House', shell: false, bg: '#2a4258', fog: ['#2a4258', 0.008], exposure: 1.5, hemi: [0xb4cadc, 0x3c5262, 2.3], moon: [0xc0d4e8, 2.6, [-12, 22, 12]],
     lights: [[0xffc27a, 34], [0xffd9a0, 18], [0x5aa0c0, 10]], ground: 0x23384a, asphalt: { color: 0xffffff, rough: 0.15, metal: 0.45, tex: 'wet' } },
   6: { name: 'Airport Terminal', shell: false, bg: '#a9c4d6', fog: ['#b6cddb', 0.007], exposure: 1.1, hemi: [0xeef6ff, 0x7d8790, 2.4], moon: [0xffffff, 2.4, [-10, 24, 12]],
     lights: [[0xffffff, 0], [0xffffff, 0], [0xffffff, 0]], ground: 0x6d767d, asphalt: { color: 0xffffff, rough: 0.7, metal: 0, tex: 'concrete' } },
-  7: { name: 'Old Town Square', shell: false, bg: '#5a4060', fog: ['#5e4666', 0.008], exposure: 1.45, hemi: [0xffdcb8, 0x6a5050, 2.3], moon: [0xffd8aa, 2.6, [-12, 20, 12]],
-    lights: [[0xffb060, 26], [0xffcf80, 20], [0xff8a60, 10]], ground: 0x5c4a42, asphalt: { color: 0xffffff, rough: 0.9, metal: 0, tex: 'cobble' } },
-  8: { name: 'Red Carpet Gala', shell: false, bg: '#3e1420', fog: ['#3e1420', 0.008], exposure: 1.5, hemi: [0xffe4c4, 0x5a2430, 2.3], moon: [0xffe8c0, 2.6, [-12, 22, 12]],
-    lights: [[0xffc860, 40], [0xff7a7a, 16], [0xffd890, 14]], ground: 0x3a1620, asphalt: { color: 0xffffff, rough: 0.3, metal: 0.2, tex: 'checker' } },
+  7: { name: 'Old Town Square', shell: false, bg: '#748398', fog: ['#9aa3a6', 0.007], exposure: 1.3, hemi: [0xffe5c4, 0x5b5146, 2.15], moon: [0xffe1b6, 2.3, [-12, 20, 12]],
+    lights: [[0xffc477, 24], [0xffd392, 16], [0xffa66b, 9]], ground: 0x9b8973, asphalt: { color: 0xffffff, rough: 0.94, metal: 0, tex: 'limestone' } },
+  8: { name: 'Red Carpet Gala', shell: false, bg: '#311b22', fog: ['#49343b', 0.007], exposure: 1.35, hemi: [0xffe8d0, 0x514249, 2.15], moon: [0xffe8c0, 2.3, [-12, 22, 12]],
+    lights: [[0xffc978, 34], [0xff8a82, 13], [0xffdca0, 14]], ground: 0x4e3e42, asphalt: { color: 0xffffff, rough: 0.36, metal: 0.12, tex: null } },
   9: { name: 'Alpine Lodge', shell: false, bg: '#3a5666', fog: ['#4a6676', 0.009], exposure: 1.5, hemi: [0xb4d0dc, 0x40584c, 2.3], moon: [0xc0d8e4, 2.6, [-12, 22, 12]],
-    lights: [[0xffa860, 28], [0xffc080, 14], [0x4a7a8a, 10]], ground: 0x2c4236, asphalt: { color: 0xffffff, rough: 0.85, metal: 0, tex: 'gravel' } },
+    lights: [[0xffa860, 28], [0xffc080, 14], [0x4a7a8a, 10]], ground: 0xd4e1eb, asphalt: { color: 0xffffff, rough: 0.32, metal: 0, tex: null } },
   10: { name: 'Skyline Rooftop', shell: true, bg: '#14224a', fog: ['#14224a', 0.007], exposure: 1.5, hemi: [0xbcd0ff, 0x34407a, 2.2], moon: [0xd0dcff, 2.6, [-12, 22, 12]],
-    lights: [[0xeab96d, 40], [0xff9ad0, 16], [0x6aa8ff, 14]], ground: 0x1e2c60, asphalt: { color: 0xffffff, rough: 0.35, metal: 0.25, tex: 'rooftop' } },
+    lights: [[0xeab96d, 40], [0xff9ad0, 16], [0x6aa8ff, 14]], ground: 0x1e2c60, asphalt: { color: 0xffffff, rough: 0.72, metal: 0, tex: null } },
 };
 
 export const venueName = (id) => (VENUES[id] || VENUES[1]).name;
 
 /* ---------- state and helpers ---------- */
-let root = null, cache = new Map(), tick = null, built = 0, lotTex = null, gTex = null, T = 0;
+let root = null, cache = new Map(), tick = null, built = 0, textureGeneration = 0, lotTex = null, groundTex = null, lotNormalTex = null, lotRoughnessTex = null, groundNormalTex = null, groundRoughnessTex = null, gTex = null, T = 0;
 const commercialCache = new Map();
 
 const pick = (a) => a[(Math.random() * a.length) | 0];
@@ -46,7 +46,11 @@ function reset() {
     root.traverse((o) => {
       if (o.geometry) o.geometry.dispose();
       const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [];
-      ms.forEach((m) => { if (m.map) m.map.dispose(); m.dispose(); });
+      ms.forEach((m) => {
+        if (m.map) m.map.dispose();
+        if (m.alphaMap && m.alphaMap !== m.map) m.alphaMap.dispose();
+        m.dispose();
+      });
     });
     root = null;
   }
@@ -219,9 +223,9 @@ function glowTexture() {
 }
 
 /* ---------- lot surfaces ---------- */
-const PERIOD = { paver: 8, neon: 8, dirt: 10, wet: 10, concrete: 8, cobble: 8, checker: 16, gravel: 8, rooftop: 8 };
+const PERIOD = { paver: 8, neon: 8, casino: 8, dirt: 10, wet: 10, concrete: 8, cobble: 8, limestone: 14, gravel: 8, rooftop: 8 };
 
-function lotTexture(kind) {
+function lotTexture(kind, surfaceWidth = 31, surfaceDepth = 22) {
   const can = document.createElement('canvas');
   can.width = can.height = 256;
   const c = can.getContext('2d');
@@ -248,6 +252,21 @@ function lotTexture(kind) {
     case 'neon':
       fill('#4c4088'); speck(500, ['#5c4fa0', '#53478f'], 3); grid(64, '#ff3da840', 2); grid(128, '#38e8ff66', 3); speck(24, ['#ffffff'], 2);
       break;
+    case 'casino':
+      fill('#252632');
+      for (let y = 0; y < 256; y += 32) for (let x = 0; x < 256; x += 64) {
+        c.fillStyle = choose(['#30313e', '#292a37', '#343340', '#2b2d39']);
+        c.fillRect(x + 1, y + 1, 62, 30);
+      }
+      grid(64, '#151722', 2);
+      for (let i = 0; i < 16; i++) {
+        const x = rnd() * 256, y = rnd() * 256;
+        c.fillStyle = i % 2 ? '#a5824b' : '#56415d';
+        c.globalAlpha = 0.18;
+        c.fillRect(x, y, 2, 2);
+      }
+      c.globalAlpha = 1;
+      break;
     case 'dirt':
       fill('#8c7049'); speck(1200, ['#7c6240', '#9b7f55', '#6f5636'], 3);
       blobs(0, '#000', 0, 1, 2);
@@ -267,9 +286,18 @@ function lotTexture(kind) {
         c.beginPath(); c.ellipse(x + (y / 32 % 2) * 16 + 16, y + 16, 14, 13, 0, 0, 6.283); c.fill();
       }
       break;
-    case 'checker':
-      for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) { c.fillStyle = (i + j) % 2 ? '#8a2438' : '#3a3a44'; c.fillRect(i * 32, j * 32, 32, 32); }
-      grid(128, '#c9a24a', 4);
+    case 'limestone':
+      fill('#b4a18a');
+      for (let row = 0; row < 8; row++) {
+        const offset = row % 2 ? 32 : 0;
+        for (let x = -64 + offset; x < 256; x += 64) {
+          c.fillStyle = choose(['#c9b89f', '#c2b097', '#bca98f', '#d1c1a8', '#b9a58b']);
+          c.fillRect(x + 1, row * 32 + 1, 62, 30);
+          c.fillStyle = 'rgba(255,244,220,0.12)';
+          c.fillRect(x + 2, row * 32 + 2, 60, 2);
+        }
+      }
+      speck(520, ['#9d8b73', '#d9c9ad', '#a7957c'], 1);
       break;
     case 'gravel':
       fill('#56676a'); speck(1600, ['#657678', '#4a5a5c', '#74868a', '#86989b'], 2); blobs(7, '#d4e2e6', 0.45, 20, 40);
@@ -282,10 +310,32 @@ function lotTexture(kind) {
   }
   const t = new THREE.CanvasTexture(can);
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.repeat.set(31 / PERIOD[kind], 22 / PERIOD[kind]);
+  t.repeat.set(surfaceWidth / PERIOD[kind], surfaceDepth / PERIOD[kind]);
   t.anisotropy = 4;
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
+}
+
+function galaMarbleMap(name, repeatX, repeatY, onLoad, color = false) {
+  const path = `./assets/ambientcg-marble/Marble001_1K-JPG_${name}.jpg`;
+  return new THREE.TextureLoader().load(path, (texture) => {
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(repeatX, repeatY);
+    texture.anisotropy = 4;
+    if (color) texture.colorSpace = THREE.SRGBColorSpace;
+    onLoad(texture);
+  }, undefined, (error) => console.warn(`Gala marble texture failed to load: ${path}`, error));
+}
+
+function venueSurfaceMap(folder, name, repeatX, repeatY, onLoad, color = false) {
+  const path = `./assets/${folder}/${name}`;
+  return new THREE.TextureLoader().load(path, (texture) => {
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(repeatX, repeatY);
+    texture.anisotropy = 4;
+    if (color) texture.colorSpace = THREE.SRGBColorSpace;
+    onLoad(texture);
+  }, undefined, (error) => console.warn(`Storm surface texture failed to load: ${path}`, error));
 }
 
 /* ---------- the venues ---------- */
@@ -306,67 +356,100 @@ function seaside() {
 }
 
 function casino() {
-  const pink = E(0xff3da8, 1.6), cyan = E(0x38e8ff, 1.6);
-  commercialBuilding('building-l.glb', -8.8, -16.8, 6.2, 0);
-  commercialBuilding('building-m.glb', 1.0, -17.2, 6.6, 0);
-  commercialBuilding('building-n.glb', 10.8, -16.8, 6.0, 0);
-  box(0, 6.85, -9.95, 24.2, 0.14, 0.14, pink, false);
-  box(0, 0.2, -9.95, 24.2, 0.14, 0.14, cyan, false);
-  const lucky = sign(0, 7.6, -9.5, 8, 1.6, 'LUCKY 7', '#ffdf5a', '#1a0630', '#ff3da8');
-  box(10.5, 3.0, -9.5, 3.4, 0.18, 1.4, cyan, false);
+  const pink = E(0xff3da8, 1.3), cyan = E(0x38e8ff, 1.2);
+  commercialBuilding('building-l.glb', -9.0, -17.2, 7.2, 0);
+  commercialBuilding('building-m.glb', 0.6, -18.0, 8.0, 0);
+  commercialBuilding('building-n.glb', 10.4, -17.2, 7.0, 0);
+  commercialBuilding('building-skyscraper-a.glb', -15.0, -19.0, 10.5, 0);
+  commercialBuilding('building-skyscraper-b.glb', 15.0, -19.0, 11.5, 0);
+  box(-1.0, 5.15, -10.0, 15.0, 2.15, 0.34, M(0x21172c, 0.42, 0.35), false);
+  box(-1.0, 6.26, -9.78, 15.4, 0.12, 0.42, pink, false);
+  box(-1.0, 4.04, -9.78, 15.4, 0.12, 0.42, cyan, false);
+  const lucky = sign(-1.0, 5.2, -9.76, 11.5, 1.35, 'NEON PALACE  ·  CASINO', '#ffe4a3', '#21172c', '#d2a856');
+  box(10.5, 3.0, -9.5, 2.6, 0.16, 0.95, M(0x23172c, 0.4, 0.2), false);
+  box(10.5, 3.1, -9.0, 2.7, 0.05, 0.08, pink, false);
   entrance(-9.9);
-  for (const x of [-14.6, -7, 7, 14.6]) lamp(x, -8.3, 3.4, x < 0 ? 0xff3da8 : 0x38e8ff, 3.4);
+  for (const x of [-14.2, -7.2, 6.8, 14.2]) lamp(x, -8.3, 3.2, x < 0 ? 0xff3da8 : 0x38e8ff, 2.8);
   for (let i = 0; i < 8; i++) {   // neon skyline on tall screens
-    const x = -21 + i * 6, h = 10 + ((i * 37) % 9);
-    box(x, h / 2, -17, 3.4, h, 2.4, M(0x0f0a20, 0.5, 0.2));
-    facade(x, h / 2, -15.78, 3.2, h - 0.4, 5, Math.round(h / 1.6), { bg: '#0f0a20', lit: i % 2 ? '#38e8ff' : '#ff3da8', p: 0.4, seed: i });
-    box(x, h + 0.1, -17, 3.5, 0.2, 2.5, i % 2 ? cyan : pink, false);
+    const x = -21 + i * 6, h = 9 + ((i * 37) % 7);
+    box(x, h / 2, -23.5, 3.4, h, 2.4, M(0x171421, 0.58, 0.12));
+    facade(x, h / 2, -22.28, 3.2, h - 0.4, 5, Math.round(h / 1.6), { bg: '#171421', lit: i % 2 ? '#38e8ff' : '#ff3da8', p: 0.28, seed: i });
+    box(x, h + 0.1, -23.5, 3.5, 0.2, 2.5, i % 2 ? cyan : pink, false);
   }
   tick = () => {
     lucky.material.color.setScalar(Math.sin(T * 23) > 0.92 ? 0.55 : 1);
-    pink.emissiveIntensity = 1.3 + 0.4 * Math.sin(T * 3);
-    cyan.emissiveIntensity = 1.3 + 0.4 * Math.sin(T * 3 + 2);
+    pink.emissiveIntensity = 1.1 + 0.25 * Math.sin(T * 3);
+    cyan.emissiveIntensity = 1.0 + 0.22 * Math.sin(T * 3 + 2);
   };
 }
 
 function buildingSite() {
-  const conc = M(0xa5a59e, 0.9);
-  for (let f = 0; f < 6; f++) {
-    box(0, 0.2 + f * 2.4, -12, 15, 0.3, 4.4, M(0x8e8e88, 0.9));
-    if (f < 5) for (const x of [-7, -3.5, 0, 3.5, 7]) for (const z of [-13.8, -10.4]) box(x, 1.4 + f * 2.4, z, 0.45, 2.4, 0.45, conc);
+  const entranceZ = -9.38;
+  const netZ = entranceZ - 0.6;
+  entrance(entranceZ);
+  commercialBuilding('building-h.glb', -8.3, -13.2, 6.8, 0);
+  commercialBuilding('building-j.glb', 0.6, -13.7, 7.6, 0);
+  commercialBuilding('building-i.glb', 8.8, -13.2, 6.8, 0);
+  const netWidth = 32, netHeight = 11.2;
+  const netTexture = new THREE.TextureLoader().load(
+    './assets/ambientcg-net/Net004A_Opacity.png',
+    undefined,
+    undefined,
+    (error) => console.warn('Construction safety net texture failed to load', error),
+  );
+  netTexture.wrapS = THREE.RepeatWrapping;
+  netTexture.wrapT = THREE.RepeatWrapping;
+  netTexture.repeat.set(12, 4);
+  const netWall = put(new THREE.Mesh(
+    new THREE.PlaneGeometry(netWidth, netHeight),
+    new THREE.MeshBasicMaterial({
+      color: 0x32b64f,
+      alphaMap: netTexture,
+      transparent: true,
+      opacity: 0.94,
+      alphaTest: 0.08,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      toneMapped: false,
+    }),
+  ), 0, netHeight / 2, netZ);
+  netWall.raycast = () => {};
+  const netFrame = M(0x4c574e, 0.52, 0.58);
+  for (const x of [-15.4, -7.7, 0, 7.7, 15.4]) {
+    box(x, netHeight / 2, netZ - 0.1, 0.16, netHeight, 0.18, netFrame, false);
   }
-  const net = new THREE.Mesh(new THREE.PlaneGeometry(15, 7.4), new THREE.MeshBasicMaterial({ color: 0x3fa34d, transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false }));
-  net.raycast = () => {};
-  put(net, 0, 3.8, -10.05);
-  for (let k = 0, x = -14; x <= 14; x += 1.5, k++) {   // barrier blocks, with a gap at the site gate
-    if (Math.abs(x - 10.5) < 1.3) continue;
-    box(x, 0.45, -9.0, 1.3, 0.9, 0.35, M(k % 2 ? 0xff7a1a : 0xf4f4ee, 0.6));
+  for (const y of [0.12, netHeight - 0.12]) {
+    box(0, y, netZ - 0.1, netWidth, 0.18, 0.18, netFrame, false);
   }
-  box(-13.3, 1.2, -10.8, 4.6, 2.4, 2.2, M(0x2f6fb0, 0.6, 0.3));
-  box(-13.3, 3.6, -10.8, 4.6, 2.4, 2.2, M(0xc0392b, 0.6, 0.3));
-  box(13.8, 1.2, -11.2, 4.2, 2.4, 2.2, M(0xe0a020, 0.6, 0.3));
-  box(10.5, 1.1, -10.4, 3, 2.2, 2, M(0xdcdcdc, 0.5));   // site office behind the gate
-  entrance(-9.38);
-  cone(-4.2, 0.8, -10.6, 1.7, 1.6, M(0x9a7e55, 1), 12);
-  cone(-1.8, 0.55, -10.4, 1.2, 1.1, M(0x8a6f48, 1), 12);
-  sign(-6.6, 1.7, -8.8, 3, 0.9, 'SLOW - WORKERS', '#161616', '#ffc400', '#161616');
+  sign(-6.6, 1.7, netZ + 0.12, 7.4, 1.05, 'SLOW WORKERS', '#161616', '#ffc400', '#161616');
+
+  const serviceRoad = M(0x333a3b, 0.94);
+  const roadPaint = M(0xd5d5c9, 0.78);
+  flatPlane(0, -0.255, 12.1, 30.5, 4.2, M(0x3f4543, 0.95));
+  for (const z of [10.15, 14.05]) {
+    box(0, -0.23, z, 29.8, 0.018, 0.07, roadPaint, false);
+  }
+  for (let x = -13.5; x <= 13.5; x += 4.5) {
+    box(x, -0.23, 12.1, 1.5, 0.018, 0.1, roadPaint, false);
+  }
+  for (const side of [-1, 1]) {
+    const roadX = side * CONE_ALLEY_ROAD.rightX;
+    flatPlane(roadX, -0.255, 1.05, 2.9, 26.3, serviceRoad);
+    box(side * 15.3, -0.23, 1.05, 0.06, 0.018, 25.9, roadPaint, false);
+    box(side * 17.35, -0.23, 1.05, 0.06, 0.018, 25.9, roadPaint, false);
+    for (let z = -10.5; z <= 12; z += 3.5) {
+      box(roadX, -0.23, z, 0.08, 0.018, 1.2, roadPaint, false);
+    }
+    for (const z of [-7, -1, 5, 11]) {
+      pine(side * 18.6, z, 3.8);
+    }
+  }
+
   for (const x of [-14.6, 14.6]) {
     cyl(x, 2.0, -8.3, 0.06, 0.08, 4, M(0x30383a, 0.4, 0.7), 8);
     box(x, 4.1, -8.3, 0.9, 0.5, 0.2, E(0xfff2c8, 2), false);
     glow(x, 4.1, -8.3, 4, 0xfff2c8, 0.55);
   }
-  // Tower crane (tall screens only). The jib swings slowly.
-  box(13.5, 8.2, -15.5, 0.7, 16.4, 0.7, M(0xf2b01e, 0.5));
-  const jib = new THREE.Group();
-  jib.position.set(13.5, 16.8, -15.5);
-  root.add(jib);
-  const part = (x, y, w, h, d, mt) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mt); o.position.set(x, y, 0); o.castShadow = true; jib.add(o); };
-  part(-6, 0, 14, 0.45, 0.45, M(0xf2b01e, 0.5));
-  part(3, 0, 5, 0.45, 0.45, M(0xf2b01e, 0.5));
-  part(4.2, -0.6, 1.2, 0.9, 0.9, M(0x555555, 0.8));
-  part(-10, -2.2, 0.06, 4, 0.06, M(0x222222, 0.8));
-  part(-10, -4.4, 0.7, 0.5, 0.7, M(0xff7a1a, 0.6));
-  tick = () => { jib.rotation.y = Math.sin(T * 0.18) * 0.3; };
 }
 
 function opera() {
@@ -408,43 +491,183 @@ function airport() {
 }
 
 function oldTown() {
-  const widths = [3.4, 3.0, 3.8, 3.2, 3.6, 3.0, 3.8, 3.4, 3.2, 3.6, 3.0, 3.4];
-  const walls = [0xd9a07a, 0xc9d6c0, 0xe8c76b, 0xb97a6a, 0xa8b8d0, 0xe3b8a0];
-  const shops = { 1: 'CAFE', 4: 'INN', 7: 'BAKERY', 10: 'BOOKS' };
-  let x = -14.4;
+  const widths = [4.8, 5.1, 4.6, 5.3, 4.7, 5.4, 4.8, 5.2, 4.6, 5.1];
+  const walls = [0xd8b38f, 0xd7d0b6, 0xc98d70, 0xe0c582, 0xb4bdab, 0xd6a087];
+  const shops = { 1: 'CAFE', 3: 'THE INN', 5: 'BAKERY', 8: 'BOOKSHOP' };
+  const shutters = [0x526653, 0x7a4c3e, 0x53677a, 0x6b5940];
+  const darkWood = M(0x49352b, 0.8);
+  const trim = M(0xeee0c4, 0.78);
+  const glass = M(0x38494a, 0.22, 0.18, { emissive: 0xc58b50, emissiveIntensity: 0.22 });
+  const stone = M(0x99866e, 0.92);
+  const terracotta = M(0x814537, 0.88);
+  const iron = M(0x303b37, 0.42, 0.65);
+  let x = -24.8;
+
+  const window = (cx, y, z, width, shutterColor, flowerColor) => {
+    box(cx, y, z, width + 0.24, 1.42, 0.14, darkWood, false);
+    box(cx, y, z + 0.09, width, 1.18, 0.05, glass, false);
+    box(cx, y, z + 0.13, 0.07, 1.16, 0.08, trim, false);
+    box(cx, y, z + 0.13, width, 0.07, 0.08, trim, false);
+    for (const side of [-1, 1]) {
+      box(cx + side * (width * 0.62), y, z + 0.08, width * 0.2, 1.38, 0.12, M(shutterColor, 0.8), false);
+      box(cx + side * (width * 0.62), y - 0.88, z + 0.15, width * 0.24, 0.16, 0.36, darkWood, false);
+      for (let i = 0; i < 3; i++) {
+        ball(cx + side * (width * 0.62) + (i - 1) * 0.12, y - 0.7, z + 0.18, 0.12, M(flowerColor, 0.9), 1.2, 0.8, 0.75);
+      }
+    }
+    box(cx, y - 0.72, z + 0.14, width + 0.32, 0.1, 0.22, trim, false);
+  };
+
   widths.forEach((w, i) => {
-    const h = 3.6 + ((i * 7) % 5) * 0.35, cx = x + w / 2;
-    box(cx, h / 2, -11.7, w, h, 4, M(walls[i % walls.length], 0.8));
-    roof(cx, h, -11.7, w / 2 + 0.15, 1.3, 4.3, M(0x7a3b2e, 0.8), true);
-    facade(cx, h / 2 + 0.3, -9.68, w - 0.5, h - 1.2, 2, 2, { bg: '#2a1d22', lit: '#ffd27a', p: 0.7, seed: i + 1 });
+    const h = 5.0 + ((i * 7) % 5) * 0.42, cx = x + w / 2;
+    const front = -9.5, centerZ = -11.05;
+    const wall = M(walls[i % walls.length], 0.88);
+    box(cx, h / 2, centerZ, w, h, 3.1, wall);
+    box(cx, 0.38, front + 0.02, w + 0.08, 0.76, 0.22, stone, false);
+    box(cx, h - 0.06, front + 0.04, w + 0.16, 0.18, 0.28, trim, false);
+    const roofRise = 1.25 + (i % 3) * 0.14;
+    const roofAngle = Math.atan2(roofRise, w / 2);
+    const roofSlope = Math.hypot(w / 2, roofRise);
+    const leftRoof = box(cx - w / 4, h + roofRise / 2, centerZ, roofSlope, 0.18, 3.3, terracotta, false);
+    const rightRoof = box(cx + w / 4, h + roofRise / 2, centerZ, roofSlope, 0.18, 3.3, terracotta, false);
+    leftRoof.rotation.z = roofAngle;
+    rightRoof.rotation.z = -roofAngle;
+    const gableShape = new THREE.Shape();
+    gableShape.moveTo(-w / 2, 0);
+    gableShape.lineTo(w / 2, 0);
+    gableShape.lineTo(0, roofRise);
+    gableShape.closePath();
+    const gable = put(new THREE.Mesh(new THREE.ShapeGeometry(gableShape), wall), cx, h, centerZ + 1.56);
+    gable.castShadow = true;
+    gable.receiveShadow = true;
+    box(cx, h + 0.12, front + 0.12, w + 0.42, 0.2, 0.28, darkWood, false);
+
+    const upperY = h * 0.66;
+    window(cx - w * 0.23, upperY, front + 0.13, w * 0.27, shutters[i % shutters.length], [0xc65d43, 0xe8b84d, 0x9b6b9b][i % 3]);
+    window(cx + w * 0.23, upperY, front + 0.13, w * 0.27, shutters[(i + 1) % shutters.length], [0xe8b84d, 0x9b6b9b, 0xc65d43][i % 3]);
+    box(cx, 3.48, front + 0.12, 0.1, 0.45, 0.14, trim, false);
+
     if (shops[i]) {
-      sign(cx, 2.5, -9.35, 1.8, 0.55, shops[i], '#fff3d6', '#5a2a22', '#d6b674');
-      box(cx, 3.0, -9.3, w - 0.4, 0.08, 0.9, M(i % 2 ? 0xb8322a : 0xf4f4ee, 0.8), false).rotation.x = 0.35;
+      const signColor = i % 2 ? '#f3e5c7' : '#f7d888';
+      const signBg = i % 2 ? '#49604f' : '#713f32';
+      const shopSign = sign(cx, 2.72, front + 0.18, Math.min(2.9, w * 0.62), 0.62, shops[i], signColor, signBg, '#c6a66f');
+      shopSign.rotation.z = 0;
+      const doorX = cx - w * 0.27;
+      box(doorX, 1.48, front + 0.15, 1.05, 2.5, 0.18, darkWood, false);
+      box(doorX, 1.54, front + 0.26, 0.82, 2.13, 0.06, M(0x6b4632, 0.72), false);
+      box(doorX + 0.23, 1.48, front + 0.3, 0.05, 1.95, 0.04, trim, false);
+      ball(doorX + 0.34, 1.38, front + 0.36, 0.07, M(0xe4bd6d, 0.35, 0.72));
+
+      const awning = M(i % 2 ? 0x49604f : 0xa74d3e, 0.8);
+      box(cx + w * 0.2, 2.82, front + 0.58, w * 0.42, 0.12, 0.9, darkWood, false);
+      for (let stripe = 0; stripe < 6; stripe++) {
+        const awningX = cx + w * 0.2 - w * 0.21 + (stripe + 0.5) * (w * 0.42 / 6);
+        box(awningX, 2.98, front + 0.58, w * 0.42 / 6 - 0.02, 0.22, 0.9, stripe % 2 ? trim : awning, false);
+      }
+      box(cx + w * 0.2, 2.86, front + 1.0, w * 0.42, 0.12, 0.14, awning, false);
+      box(cx + w * 0.2, 1.42, front + 0.16, w * 0.42, 1.95, 0.1, darkWood, false);
+      box(cx + w * 0.2, 1.45, front + 0.23, w * 0.37, 1.7, 0.05, glass, false);
+      box(cx + w * 0.2, 1.45, front + 0.27, 0.07, 1.7, 0.05, trim, false);
+    } else if (i !== 7) {
+      const doorX = cx - w * 0.24;
+      box(doorX, 1.35, front + 0.14, 1.05, 2.25, 0.18, darkWood, false);
+      box(doorX, 1.4, front + 0.25, 0.82, 1.9, 0.06, M(0x704b36, 0.78), false);
+      ball(doorX + 0.3, 1.32, front + 0.34, 0.06, M(0xe4bd6d, 0.35, 0.72));
+      box(cx + w * 0.2, 1.55, front + 0.14, w * 0.38, 2.0, 0.16, darkWood, false);
+      box(cx + w * 0.2, 1.58, front + 0.24, w * 0.32, 1.72, 0.05, glass, false);
     }
     x += w;
   });
-  entrance(-9.66);
-  for (let i = 0; i < 24; i++) glow(-14 + i * 1.2, 3.8 - 0.45 * Math.sin(i / 23 * Math.PI * 3), -9.1, 0.9, 0xffd27a, 0.9);   // string lights
-  for (const lx of [-14.6, -4, 4.5, 14.6]) lamp(lx, -8.2, 3.2, 0xffb868, 3);
+  entrance(-9.52);
+
+  // The perimeter plaza continues beyond the parking kerb as a pedestrian street.
+  const paving = M(0xb8a68d, 0.94);
+  flatPlane(0, -0.245, 12.35, 31.0, 5.0, paving);
+  for (const z of [9.9, 14.8]) box(0, -0.19, z, 30.8, 0.12, 0.16, stone, false);
+  for (const side of [-1, 1]) {
+    const sx = side * 17.45;
+    flatPlane(sx, -0.245, 0, 4.6, 30.8, paving);
+    box(side * 15.18, -0.19, 0, 0.18, 0.12, 30.5, stone, false);
+    for (const z of [-8, -1, 6]) {
+      lamp(side * 17.25, z, 3.4, 0xffd18b, 2.5);
+      box(side * 20.0, 0.32, z, 1.45, 0.58, 1.45, stone, false);
+      box(side * 20.0, 0.65, z, 1.22, 0.12, 1.22, M(0x534539, 0.95), false);
+      cyl(side * 20.0, 1.28, z, 0.12, 0.16, 1.25, M(0x71533c, 0.92), 8);
+      for (let leaf = 0; leaf < 5; leaf++) {
+        const a = leaf * Math.PI * 0.4;
+        ball(side * 20.0 + Math.cos(a) * 0.48, 2.05 + (leaf % 2) * 0.2, z + Math.sin(a) * 0.48, 0.56, M(leaf % 2 ? 0x64784f : 0x78845a, 0.95), 1.15, 0.95, 1.0);
+      }
+      ball(side * 20.0, 2.35, z, 0.56, M(0x718054, 0.95), 1.1, 1.0, 1.0);
+    }
+  }
+
+  const benchWood = M(0x76513a, 0.8);
+  for (const bx of [-11.4, 11.4]) {
+    for (const plank of [-0.22, 0, 0.22]) box(bx, 0.52, 12.4 + plank, 2.0, 0.09, 0.16, benchWood, false);
+    box(bx, 1.02, 12.82, 2.0, 0.78, 0.1, benchWood, false);
+    for (const legX of [-0.72, 0.72]) {
+      box(bx + legX, 0.32, 12.4, 0.12, 0.64, 0.12, iron, false);
+      box(bx + legX, 0.8, 12.82, 0.12, 0.64, 0.12, iron, false);
+    }
+  }
+  for (const bx of [-6.6, 6.6]) {
+    box(bx, 0.34, 12.4, 1.15, 0.66, 1.15, stone, false);
+    box(bx, 0.69, 12.4, 0.98, 0.08, 0.98, darkWood, false);
+    for (let flower = 0; flower < 7; flower++) {
+      const a = flower / 7 * Math.PI * 2;
+      ball(bx + Math.cos(a) * 0.3, 0.92 + (flower % 2) * 0.12, 12.4 + Math.sin(a) * 0.3, 0.17, M([0xc65d43, 0xe8b84d, 0x9b6b9b][flower % 3], 0.9));
+    }
+  }
+
+  for (let i = 0; i < 24; i++) glow(-14 + i * 1.2, 4.0 - 0.4 * Math.sin(i / 23 * Math.PI * 3), -9.05, 0.8, 0xffd27a, 0.72);
+  for (const lx of [-14.6, -4, 4.5, 14.6]) lamp(lx, -8.2, 3.2, 0xffc477, 2.8);
 }
 
 function gala() {
   const gold = M(0xd6b674, 0.3, 0.7, { emissive: 0x5a431e, emissiveIntensity: 0.3 });
-  box(0, 3.6, -12.4, 24, 7.2, 4.6, M(0x1c0c10, 0.4, 0.3));
-  facade(0, 3.0, -10.08, 23, 4.4, 12, 2, { bg: '#2a0c12', lit: '#ffd890', p: 0.7, seed: 4 });
-  for (const x of [-10, -7.5, -5, -2.5, 0, 2.5, 5, 7.5, 13]) cyl(x, 3.2, -9.7, 0.28, 0.3, 6.4, gold);
+  commercialBuilding('building-j.glb', -14.5, -17.3, 8.5, 0);
+  commercialBuilding('building-m.glb', -5.0, -18.2, 8.0, 0);
+  commercialBuilding('building-n.glb', 4.5, -17.7, 9.2, 0);
+  commercialBuilding('building-k.glb', 15.0, -17.3, 8.0, 0);
+  commercialBuilding('building-skyscraper-a.glb', -23.2, -20.0, 12.5, 0);
+  commercialBuilding('building-skyscraper-b.glb', 23.2, -20.0, 12.5, 0);
+  for (const x of [-13.5, -6.5, 6.5, 13.5]) cyl(x, 3.2, -9.7, 0.28, 0.3, 6.4, gold);
   box(0, 6.4, -9.8, 24.4, 0.35, 0.6, gold);
   box(0, 0.25, -9.8, 24.4, 0.3, 0.6, gold);
   sign(0, 5.0, -9.6, 9, 1.7, 'THE GALA', '#ffe08a', '#2a0c12', '#d6b674');
   const carpet = M(0xa0122a, 0.9);
+  const velvet = M(0x8e182e, 0.72);
   flatPlane(0, 0.03, -8.5, 28, 1.4, carpet);
   box(0, 0.04, -7.78, 28, 0.03, 0.08, gold, false);
   box(0, 0.04, -9.22, 28, 0.03, 0.08, gold, false);
-  for (let px = -13; px <= 13; px += 2.2) {
-    if (Math.abs(px - 10.5) < 1.2) continue;
-    cyl(px, 0.45, -7.75, 0.05, 0.05, 0.9, gold, 8);
-    ball(px, 0.95, -7.75, 0.08, gold);
+  for (const side of [-1, 1]) {
+    const ropeZ = -8.5 + side * 0.72;
+    const positions = [];
+    for (let px = -13; px <= 13; px += 2.2) {
+      if (Math.abs(px - 10.5) < 1.2) continue;
+      cyl(px, 0.45, ropeZ, 0.05, 0.05, 0.9, gold, 8);
+      ball(px, 0.95, ropeZ, 0.08, gold);
+      positions.push(px);
+    }
+    for (let i = 0; i < positions.length - 1; i++) {
+      if (Math.abs((positions[i] + positions[i + 1]) / 2 - 10.5) < 1.6) continue;
+      box((positions[i] + positions[i + 1]) / 2, 0.68, ropeZ, positions[i + 1] - positions[i], 0.065, 0.065, velvet, false);
+    }
   }
+
+  const urnGold = M(0xb78a47, 0.34, 0.68);
+  const flowerColors = [0xffe6cf, 0xd94a5c, 0xffc247, 0xf3eeee];
+  for (const [x, z] of [[-14.4, -8.5], [14.4, -8.5], [-14.4, 11.6], [14.4, 11.6]]) {
+    cyl(x, 0.12, z, 0.55, 0.58, 0.24, urnGold, 12);
+    cyl(x, 0.52, z, 0.43, 0.3, 0.62, urnGold, 12);
+    cyl(x, 0.88, z, 0.31, 0.42, 0.16, gold, 12);
+    for (let i = 0; i < 9; i++) {
+      const a = i / 9 * Math.PI * 2;
+      ball(x + Math.cos(a) * 0.34, 1.2 + (i % 3) * 0.08, z + Math.sin(a) * 0.34, 0.2, M(flowerColors[i % flowerColors.length], 0.72), 1.0, 0.82, 1.0);
+    }
+    ball(x, 1.38, z, 0.2, M(0xffe6cf, 0.72));
+  }
+
   entrance(-10.06);
   for (const x of [-9, -3, 3, 9]) glow(x, 4.3, -9.4, 2.6, 0xffd890, 0.7);
   const beams = [];   // searchlights sweeping the sky
@@ -469,6 +692,13 @@ function lodge() {
   box(-6, 6.3, -12.6, 1, 3, 1, M(0x6a6a66, 0.9));
   sign(-1, 3.5, -9.1, 4, 0.8, 'ALPINE LODGE', '#ffe3b0', '#3a2414', '#d6b674');
   entrance(-10.18);
+  const snow = M(0xdce8f0, 0.94);
+  for (const side of [-1, 1]) {
+    for (const [z, sx, sz] of [[-6.5, 1.5, 0.8], [-1.4, 2.0, 0.75], [4.1, 1.7, 0.9], [8.7, 2.1, 0.7]]) {
+      const drift = ball(side * 17.7, 0.08, z, 1, snow, sx, 0.42, sz);
+      drift.rotation.y = side * 0.18;
+    }
+  }
   for (const [x, z, h] of [[-15, -9.5, 5], [-12.8, -9.8, 4.4], [13, -9.6, 4.6], [15.2, -9.3, 5.2], [-16.3, -4, 4.4], [16.3, -2, 4.6], [-16.3, 3, 4.8], [16.3, 4.5, 4.4]]) pine(x, z, h);
   for (const [x, r, h] of [[-12, 9, 11], [4, 11, 13], [18, 8, 10]]) {   // mountains on tall screens
     cone(x, h / 2, -28, r, h, M(0x7e8e98, 1), 7);
@@ -479,11 +709,27 @@ function lodge() {
 
 function finale() {
   const gold = 0xffd27a;
-  for (let i = 0; i < 9; i++) {   // skyscrapers behind the hotel (tall screens)
-    const x = -24 + i * 6, h = 14 + ((i * 53) % 13);
-    box(x, h / 2, -27, 4.2, h, 3, M(0x0b1230, 0.4, 0.4));
-    facade(x, h / 2, -25.48, 4, h - 0.6, 6, Math.round(h / 1.5), { bg: '#0b1230', lit: i % 3 ? '#ffd27a' : '#9ad0ff', p: 0.45, seed: i + 11 });
-    if (i % 2 === 0) ball(x, h + 0.4, -27, 0.25, E(0xff4040, 2));
+  const skyline = [
+    ['building-skyscraper-a.glb', -16.2, -6.5, 8],
+    ['building-skyscraper-b.glb', -16.2, 1.5, 10],
+    ['building-skyscraper-d.glb', 16.2, -6.5, 8],
+    ['building-skyscraper-e.glb', 16.2, 1.5, 10],
+  ];
+  skyline.forEach(([asset, x, z, height]) => commercialBuilding(asset, x, z, height));
+
+  const rail = M(0x7785a0, 0.42, 0.62);
+  for (const side of [-1, 1]) {
+    const x = side * 15.58;
+    box(x, 1.12, -0.5, 0.12, 0.1, 19.8, rail, false);
+    box(x, 0.56, -0.5, 0.1, 0.08, 19.8, rail, false);
+    for (let z = -10.0; z <= 9; z += 2.8) box(x, 0.62, z, 0.1, 1.24, 0.1, rail, false);
+  }
+  box(0, 1.12, 10.22, 30.8, 0.1, 0.12, rail, false);
+  box(0, 0.56, 10.22, 30.8, 0.08, 0.1, rail, false);
+  for (let x = -15.0; x <= 15; x += 2.8) box(x, 0.62, 10.22, 0.1, 1.24, 0.1, rail, false);
+  for (const x of [-15.58, 15.58]) {
+    ball(x, 1.35, 10.22, 0.13, E(0xff526f, 1.8));
+    glow(x, 1.4, 10.22, 1.8, 0xff526f, 0.6);
   }
   ball(-14, 19, -30, 2.6, E(0xdfe8ff, 1));   // the moon
   for (let x = -13; x <= 13; x += 1.3) glow(x, 4.3, -8.1, 0.8, gold, 0.8);   // festival lights along the canopy
@@ -524,6 +770,7 @@ export function applyVenue(id = 1) {
   const key = VENUES[id] ? id : 1;
   if (key === built) return;
   built = key;
+  const generation = ++textureGeneration;
   const v = VENUES[key];
   reset();
   scene.background.set(v.bg);
@@ -537,10 +784,95 @@ export function applyVenue(id = 1) {
   rig.moon.intensity = v.moon[1];
   rig.moon.position.set(...v.moon[2]);
   [rig.hotel, rig.warm, rig.cool].forEach((l, i) => { l.color.setHex(v.lights[i][0]); l.intensity = v.lights[i][1]; });
+  if (groundTex) { groundTex.dispose(); groundTex = null; }
+  if (lotNormalTex) { lotNormalTex.dispose(); lotNormalTex = null; }
+  if (lotRoughnessTex) { lotRoughnessTex.dispose(); lotRoughnessTex = null; }
+  if (groundNormalTex) { groundNormalTex.dispose(); groundNormalTex = null; }
+  if (groundRoughnessTex) { groundRoughnessTex.dispose(); groundRoughnessTex = null; }
+  surf.ground.map = null;
+  surf.ground.normalMap = null;
+  surf.ground.roughnessMap = null;
+  surf.ground.normalScale.set(1, 1);
   surf.ground.color.setHex(v.ground);
   const a = surf.asphalt, ap = v.asphalt;
   if (lotTex) { lotTex.dispose(); lotTex = null; }
-  if (ap.tex) { lotTex = lotTexture(ap.tex); a.map = lotTex; a.color.setHex(0xffffff); } else { a.map = null; a.color.setHex(ap.color); }
+  a.map = null;
+  a.normalMap = null;
+  a.roughnessMap = null;
+  a.normalScale.set(1, 1);
+  if (key === 8) {
+    lotTex = galaMarbleMap('Color', 31 / 8, 22 / 8, (texture) => {
+      if (generation !== textureGeneration) { texture.dispose(); return; }
+      a.map = texture;
+      groundTex = texture.clone();
+      groundTex.repeat.set(52 / 8, 42 / 8);
+      groundTex.needsUpdate = true;
+      surf.ground.map = groundTex;
+      surf.ground.needsUpdate = true;
+      a.needsUpdate = true;
+    }, true);
+    lotNormalTex = galaMarbleMap('NormalGL', 31 / 8, 22 / 8, (texture) => {
+      if (generation !== textureGeneration) { texture.dispose(); return; }
+      a.normalMap = texture;
+      a.needsUpdate = true;
+    });
+    lotRoughnessTex = galaMarbleMap('Roughness', 31 / 8, 22 / 8, (texture) => {
+      if (generation !== textureGeneration) { texture.dispose(); return; }
+      a.roughnessMap = texture;
+      a.needsUpdate = true;
+    });
+    a.normalScale.set(0.08, 0.08);
+    a.color.setHex(0x9c817a);
+    surf.ground.color.setHex(0x9c817a);
+  } else if (ap.tex) {
+    lotTex = lotTexture(ap.tex);
+    a.map = lotTex;
+    a.color.setHex(0xffffff);
+    if (key === 7 || key === 8) {
+      groundTex = lotTexture(ap.tex, 52, 42);
+      surf.ground.map = groundTex;
+      surf.ground.color.setHex(0xffffff);
+    }
+  } else if (key === 9) {
+    const assignStormMap = (path, target, repeats, color = false) => venueSurfaceMap('ambientcg-storm', path, repeats[0], repeats[1], (texture) => {
+      if (generation !== textureGeneration) { texture.dispose(); return; }
+      target(texture);
+      a.needsUpdate = true;
+      surf.ground.needsUpdate = true;
+    }, color);
+    lotTex = assignStormMap('Asphalt001_1K-JPG_Color.jpg', (texture) => { a.map = texture; }, [31 / 8, 22 / 8], true);
+    lotNormalTex = assignStormMap('Asphalt001_1K-JPG_NormalGL.jpg', (texture) => { a.normalMap = texture; }, [31 / 8, 22 / 8]);
+    lotRoughnessTex = assignStormMap('Asphalt001_1K-JPG_Roughness.jpg', (texture) => { a.roughnessMap = texture; }, [31 / 8, 22 / 8]);
+    groundTex = assignStormMap('Snow001_1K-JPG_Color.jpg', (texture) => { surf.ground.map = texture; }, [52 / 18, 42 / 18], true);
+    groundNormalTex = assignStormMap('Snow001_1K-JPG_NormalGL.jpg', (texture) => { surf.ground.normalMap = texture; }, [52 / 18, 42 / 18]);
+    groundRoughnessTex = assignStormMap('Snow001_1K-JPG_Roughness.jpg', (texture) => { surf.ground.roughnessMap = texture; }, [52 / 18, 42 / 18]);
+    a.color.setHex(0x71828c);
+    a.normalScale.set(0.16, 0.16);
+    surf.ground.color.setHex(0xd4e1eb);
+    surf.ground.normalScale.set(0.12, 0.12);
+  } else if (key === 10) {
+    const lotRepeat = [31 / 2.2, 22 / 1.1];
+    const groundRepeat = [52 / 2.2, 42 / 1.1];
+    const assignFinaleMap = (name, setLot, setGround, color = false) => venueSurfaceMap('ambientcg-finale', name, lotRepeat[0], lotRepeat[1], (texture) => {
+      if (generation !== textureGeneration) { texture.dispose(); return; }
+      setLot(texture);
+      const groundTexture = texture.clone();
+      groundTexture.repeat.set(groundRepeat[0], groundRepeat[1]);
+      groundTexture.needsUpdate = true;
+      setGround(groundTexture);
+      a.needsUpdate = true;
+      surf.ground.needsUpdate = true;
+    }, color);
+    lotTex = assignFinaleMap('Concrete034_1K-JPG_Color.jpg', (texture) => { a.map = texture; }, (texture) => { surf.ground.map = texture; }, true);
+    lotNormalTex = assignFinaleMap('Concrete034_1K-JPG_NormalGL.jpg', (texture) => { a.normalMap = texture; }, (texture) => { surf.ground.normalMap = texture; });
+    lotRoughnessTex = assignFinaleMap('Concrete034_1K-JPG_Roughness.jpg', (texture) => { a.roughnessMap = texture; }, (texture) => { surf.ground.roughnessMap = texture; });
+    a.color.setHex(0x71809c);
+    a.normalScale.set(0.12, 0.12);
+    surf.ground.color.setHex(0x35415c);
+    surf.ground.normalScale.set(0.08, 0.08);
+  } else a.color.setHex(ap.color);
+  surf.ground.roughness = key === 8 ? 0.62 : key === 10 ? 0.88 : 0.95;
+  surf.ground.needsUpdate = true;
   a.roughness = ap.rough;
   a.metalness = ap.metal;
   a.needsUpdate = true;
@@ -554,7 +886,7 @@ export function applyVenue(id = 1) {
   if (BUILD[key]) BUILD[key]();
 }
 
-// Per-frame animation for the current venue (neon flicker, crane, searchlights, fireworks). Called while a shift runs.
+// Per-frame animation for the current venue (neon flicker, searchlights, fireworks). Called while a shift runs.
 export function updateVenue(dt) {
   if (!tick) return;
   T += dt;

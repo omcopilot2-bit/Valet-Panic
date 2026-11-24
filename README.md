@@ -10,25 +10,25 @@ Each shift has a set number of guests (10–19), a time limit (210–370 s) and 
 
 | # | Shift | What is different |
 |---|---|---|
-| 1 | Welcome Shift | 4 bays, wide rings, gentle pace |
-| 2 | Lunch Rush | Six open bays in staggered 90-degree rows |
-| 3 | Casino Roundabout | **Reverse park** around the fountain, with angled bays |
-| 4 | Cone Alley | Planted median and traffic cones shape the approach |
+| 1 | Welcome Shift | All 8 bays, wide rings, gentle pace |
+| 2 | Lunch Rush | All 8 bays in staggered 90-degree rows |
+| 3 | Casino Roundabout | **Reverse park** in 8 clear bays around a central fountain |
+| 4 | Cone Alley | Kenney city backdrops, concrete surfacing and wider cone gaps |
 | 5 | Opera Red Carpet | **Slippery tarmac**, angled bays flank the carpet |
-| 6 | Terminal Run | Kerb-side bays along the terminal edges |
-| 7 | Tight Squeeze | Only 4 bays open, **tiny rings**, slower park speed |
+| 6 | Terminal Run | All 8 kerb-side bays along the terminal edges |
+| 7 | Tight Squeeze | All 8 bays, **tiny rings**, slower park speed |
 | 8 | VIP Gala | Half the guests are VIPs (double tips), noisy quirk cars |
-| 9 | Valet Storm | 60-degree stalls, slick lanes, cones and three guests at once |
-| 10 | Midnight Finale | Reverse parking around a planted median + VIPs |
+| 9 | Valet Storm | 60-degree stalls on wet PBR asphalt, with snowy alpine grounds and snow-lined edges |
+| 10 | Midnight Finale | Reverse park on a PBR concrete rooftop beneath a lit city skyline |
 
-Closed bays are marked in red and are solid (the collider sits exactly on the closed bay, so open bays are never blocked). All the numbers live in `LEVELS` in `config.js` (`guests`, `secs`, `stars`, `callsFrom`, `calls`…); **the star goals are first estimates, so tune them after playtests.**
+All eight bays are available on every shift; parking capacity and difficulty come from the venue layout, parking rules, hazards, and timing rather than closed-bay blockers. All the numbers live in `LEVELS` in `config.js` (`guests`, `secs`, `stars`, `callsFrom`, `calls`…); **the star goals are first estimates, so tune them after playtests.**
 
 ### The rival duel
 - **Score:** every car you park and every car you return is 1 point; the same for the rival. The HUD box **YOU–RIVAL** shows the live score (green ▲ when you lead, red ▼ when you trail, so it does not rely on colour alone).
 - **Stars:** ★ beat the rival (a tie is not a win) · ★★ win by about 15% of the shift's car moves · ★★★ win by about 30% (`duelGoals()` in `config.js`; e.g. shift 1 is win / +4 / +7). Tips still count for the score and the shift best, but no longer decide stars.
 - **How he plays:** he stands near the start, notices a new job after a short reaction delay, runs to it and, if you have not taken it first, hops in and drives it along a lane route (`routes.js`), pathfinding around shift hazards. Two kinds of job: the 🔑 car at the drop-off, or a 🔔 car a guest wants back. If you reach a car first, he goes looking for another. He never crashes and never fails a guest, so the only way to beat him is speed and combos.
 - **Difficulty** rises with the shift (`diff`): his run speed is 3.4 + 0.17×diff (you run at 4.8), driving speed 3.0 + 0.15×diff (you top out at 4.4), and he notices a job after max(0.35, 1.6 − 0.12×diff) seconds (`newRival()` in `rival.js`). In the car he yields to other moving cars and navigates around the shift hazards.
-- **Honk (H / HONK button)** freezes a rival who is running within a few metres for about a second.
+- **Honk (H / horn icon)** freezes a rival who is running within a few metres for about a second.
 - The tutorial has no rival. People are solid for cars: you cannot drive through the rival, guests or the doorman.
 
 ### How a shift plays
@@ -87,13 +87,14 @@ Every run earns XP (Memory and Duel runs; stars and first clears pay extra). Pla
 
 ## Controls
 - WASD / arrow keys: drive and steer (in Shifts: run, when you are on foot). Movement follows the physical key position, so French keyboards get ZQSD (and the hints say so on Chromium); the letter printed on the key works too. The boon picker accepts the digit row and the numpad.
+- Touch screens: use the left joystick to run on foot; while driving, drag the left steering wheel and hold the large **GAS** or **BRAKE / REV** pedals on the right. The horn icon honks; **ACTION** appears only when entering, parking, or handing over is currently valid. Use the fullscreen button for a wider view; rotate to landscape if the browser cannot lock orientation.
 - E / Space / ACTION button: get into a car (Shifts, on foot), park, or hand a car over. In Shifts you also hop in by running up to the 🔑 / 🔔 car, and a gold arrow points the way.
 - Space: park when you are in the highlighted bay, lined up and moving slowly
 - Click/tap a parked car: return the car requested by the lobby
 - P or the ❚❚ button: pause/resume (Escape remains available to exit platform fullscreen; switching tabs also pauses)
-- H, or the on-screen HONK button on touch: honk (Shifts, while driving)
+- H, or the on-screen horn icon on touch: honk (Shifts, while driving)
 - ♫: toggle sound
-- Touch: on-screen arrows, Park / Action and (in Shifts) Honk buttons on narrow screens
+- Touch: joystick on foot; steering wheel, gas, brake/reverse, and available-action controls while driving
 
 ## Run locally
 The game uses ES modules, so serve it over HTTP rather than opening `index.html` as `file://`:
@@ -127,14 +128,14 @@ Flat ES modules; no production bundler or root npm scripts are configured. Serve
 | `hud.js` | the Duel HUD (`updateRushHUD()`) |
 | `results.js` | the end-of-shift results card |
 | `routes.js` | pure waypoint helpers for the rival (walking and driving lanes, approach points); unit-tested |
-| `shifts-world.js` | Shifts support: level layout (closed bays, cones, cart), tokens and power-ups, events, honk, near miss, boon picker |
+| `shifts-world.js` | Shifts support: venue layouts, hazards, tokens and power-ups, events, honk, near miss, boon picker |
 | `config.js` | all tuning constants and static data (`LEVELS`, perks, quirks, specials, cosmetics, layout) |
 | `progress.js` | off-platform local save, account-scoped CrazyGames Data save, XP and levels, unlock rules, the playtest log |
 | `platform.js` | CrazyGames SDK wrapper: only loads the SDK on CrazyGames (or with `?sdk`), a no-op elsewhere. Gameplay/loading events, game settings and system info, Data module, ad-blocker check, midgame and rewarded ads |
 | `keymap.js` | pure key-event naming (layout-independent movement keys) |
 | `world.js` | lighting, forecourt, hotel, bays, props and prop colliders |
 | `audio.js` | car-specific synthesized engines, sampled rev accents and effects, procedural music |
-| `assets/` | bundled Three.js, Kenney car models and sounds (`assets/sounds/CREDITS.txt`) |
+| `assets/` | bundled Three.js, Kenney venue and car models, and sounds (`assets/sounds/CREDITS.txt`) |
 | `assets/covers/` | original source illustrations in landscape, portrait and square layouts; export PNGs at the portal's required dimensions before submission |
 
 **Shared state rule:** ES imports are read-only, so any value that several modules reassign lives on the `G` object (`G.score += 5`). Objects that are only mutated (`rush`, `keys`…) are exported directly. `shifts-world` no longer imports `shifts`: the two things it needed (`addTime`, the HUD refresh) live in `state.js` (`addTime`, `hooks.rushHud`, which `shifts.js` fills in). `rivalScore()` lives in `state.js` and the HUD in `hud.js`, so `rival`, `hud` and `results` do not need the game loop. Some modules still import each other in a cycle (e.g. `cars` ↔ `classic`, `cars` ↔ `shifts`, `rival` ↔ `shifts`); that is safe because they only reference each other's functions inside function bodies. Don't call another game module's function at module top level (`people.js` builds the pick-up and drop-off rings there, but only from `world.js` helpers, never from the cyclic game modules).
@@ -146,9 +147,9 @@ Flat ES modules; no production bundler or root npm scripts are configured. Serve
 - Collisions: cars are two circles (radius 0.7, centred ±0.7 from the middle; matches the ~2.85 × 1.4 body) vs. parked-car boxes and props. `collision.js` holds the constants and `circleVsCollider()`, which every mover (cars, walkers, the player, the rival) shares. Props with `halfX`/`halfZ` (planters) collide as real boxes, not bounding circles. Bollards moved out of the bays.
 - Anti-stuck: scripted cars (delivery exit, arrivals, rival) wait for traffic at most ~2–3 s, then creep on, so two cars can never deadlock. Walkers that make no progress for 0.6 s take their best open direction. The rival's A* obstacle clearance is `GRID_CLEAR` (1.05) in `rival.js`.
 - Guests can reach the hotel door: guests, dogs and the doorman carry `buildingRoute`, which skips the lot-boundary and prop push-back near the sidewalk strip (`WALK_Z`) so angled bays and planters cannot block the entrance.
-- The island shift's median is visual only (no collider): cars may drive over it, which keeps the aisle and exit lane open. Cones (r 0.5) and the cart (r 0.85) have smaller colliders than before.
+- The island shift's median is visual only (no collider): cars may drive over it, which keeps the aisle and exit lane open. Cones use small colliders; the luggage cart/robot is not spawned.
 - Exit: cars back out of the bay into a lane and drive off, instead of driving through neighbours.
-- Pilot layouts: Shift 3 uses a 45°/radial casino fountain arrangement, Shift 5 uses opposing bay columns around a central opera carpet, and Shift 6 uses parallel airport kerb-side rows. Shift-specific bay centres and headings are in `config.js`.
+- Pilot layouts: Shift 3 uses two inward-facing casino rows around a central fountain, with a clear side aisle for departures; Shift 5 uses opposing bay columns around a central opera carpet, and Shift 6 uses parallel airport kerb-side rows. Shift-specific bay centres and headings are in `config.js`.
 - Main menu button on the end screen restores the title screen.
 - Reduced-motion users get no screen shake, red flash or particles. Pinch-zoom is no longer disabled.
 - Quality: devices with 4 GB RAM or less, 4 cores or fewer, or a touch screen start in a lighter mode (pixel ratio 1, 1024 shadow map). Any device drops to it after about six seconds under 40 fps.
@@ -171,7 +172,7 @@ It cannot test driving feel, collisions, player-input feel or visuals.
 
 ## Known gaps
 - The rival's speeds, reaction times and duel star margins still need tuning from human playtests. Use the debug playtest log to compare player and rival wins across shifts. The old tip-based `stars` in `LEVELS` are unused for Duel.
-- Collision/entry pass: stuck states from over-strict colliders and guests unable to enter the hotel were fixed; still needs hands-on playtesting on every shift layout (angled bays, island, cart).
+- Collision/entry pass: stuck states from over-strict colliders and guests unable to enter the hotel were fixed; still needs hands-on playtesting on every shift layout (angled bays, islands, Casino roundabout, Airport rows).
 - Fixed in this round: a full lot froze every shift if you had parked fewer than 2 cars yourself (the call timer only counted your own parks, and the rival now parks too).
 - Rival routes are deterministic; the headless simulation does not measure whether the opponent feels fair or fun.
 - Classic retune is untested.
@@ -181,7 +182,11 @@ It cannot test driving feel, collisions, player-input feel or visuals.
 
 ## Included game assets
 - Five vehicle models from Kenney's Car Kit, CC0 1.0 (`assets/vehicles/Kenney-Car-Kit-License.txt`).
+- Kenney City Kit (Commercial) models for venue backdrops, CC0 1.0.
+- [AmbientCG Concrete 034](https://ambientcg.com/view?id=Concrete034) PBR maps for the Midnight Finale rooftop, CC0 1.0 (`assets/ambientcg-finale/`).
+- [AmbientCG Net 004 A](https://ambientcg.com/a/Net004A) opacity map for Cone Alley's green construction safety net, CC0 1.0 (`assets/ambientcg-net/Net004A_Opacity.png`).
 - Three.js r187 and GLTF loader utilities, MIT (`assets/three/LICENSE`).
+- [Font Awesome Free Bullhorn](https://github.com/FortAwesome/Font-Awesome/blob/6.x/svgs/solid/bullhorn.svg), by Fonticons, Inc., CC BY 4.0 (`assets/ui/bullhorn.svg`).
 - Sound effects: CC0 (Kenney, plus Freesound originals via OpenTTD OpenSFX); sources in `assets/sounds/CREDITS.txt`.
 - All game assets, including the Fredoka and Nunito UI fonts, are bundled locally. System fonts (Trebuchet MS / Segoe UI / system-ui) remain as fallbacks.
 

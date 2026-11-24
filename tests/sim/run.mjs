@@ -8,6 +8,7 @@ const state = await import(P + 'state.js');
 const shifts = await import(P + 'shifts.js');
 const sw = await import(P + 'shifts-world.js');
 const people = await import(P + 'people.js');
+const routes = await import(P + 'routes.js');
 const world = await import(P + 'world.js');
 const prog = await import(P + 'progress.js');
 const { G, rush, slots, cars, tutorial } = state;
@@ -34,7 +35,7 @@ function bot(mode) {
     const w = rush.waiting && rush.waiting.waiting ? rush.waiting : null;
     const call = rush.calls.find((c) => c.state === 'waiting');
     if (w) { pl.x = w.x; pl.z = w.z + 0.9; }
-    else if (call) { const c = call.car; pl.x = c.x; pl.z = c.slot && c.slot.z < 0 ? -2.9 : 3.0; }
+    else if (call) { const c = call.car; const p = routes.approachPoint('deliver', c); pl.x = p.x; pl.z = p.z; }
   } else if (G.activeCar) {
     const c = G.activeCar;
     c.vx = c.vz = c.speed = 0;
