@@ -1,5 +1,5 @@
 // The rival valet: an AI opponent that races you for the same cars. Split out of shifts.js; it only reads and writes the shared `rush` / `cars` state.
-import { buildPlan, clearanceFn, routeAround, stepDrive } from './autodrive.js';
+import { buildPlan, clearanceFn, DRIVER, routeAround, stepDrive } from './autodrive.js';
 import { HANDOFF, PARKED_HALF, reduceMotion } from './config.js';
 import { carPathBlocked, carPathHitsCircle } from './collision.js';
 import { audio, bubble, parkYaw, popScore, worldToScreen } from './core.js';
@@ -18,7 +18,21 @@ const RIVAL_HOME = { x: -6.2, z: 7.5 };
 const RIVAL_LINES = ['Too slow!', 'Mine!', 'Thanks, rookie!', 'Beep beep!', 'Keys, please!'];
 // His cruise speed is rv.drive x this. The shared driver brakes for bends, reverses and creeps into bays like a person would,
 // so a trip takes ~2 s longer than the old fixed-speed slide; raise this to make him quicker, lower it to ease him off.
-const RIVAL_PACE = 1.3;
+const RIVAL_PACE = 1.45;
+// How the rival drives: quicker off the line, later on the brakes, braver in bends, less creeping into bays.
+// Turn rate is raised a little so he can actually hold the faster corner speed without drifting wide.
+// Speedy almost all the time: hard on the throttle and brakes, quick hands on the wheel, fast through bends,
+// and he only eases off in the last metre before a stop. He still stops dead for another car (an emergency).
+const RIVAL_DRIVER = {
+  ...DRIVER,
+  accel: 11, revAccel: 8, brake: 14, brakeUse: 0.9,   // punchy off the line, brakes late and hard
+  latAccel: 9, curveMin: 1.8,                         // fast through bends, never crawls round a corner
+  turnRate: 2.2, steerRate: 9, rollSpeed: 1.0,        // quick hands, so he can hold that corner speed
+  alignSlow: 0.35, alignMin: 1.6,                     // barely slows while straightening up
+  revSpeed: 5, gearPause: 0.03,                       // reverses briskly, near-instant gear changes
+  creepBase: 1.2, creepRate: 2.6,                     // full speed until about 1.5 m from the bay / ring
+  crawl: 1.6,                                         // eases past people, but briskly
+};
 
 // Everything solid he has to steer round: level props, closed bays and every other car.
 function obstaclesFor(car) {
@@ -172,7 +186,7 @@ export function stepRivalCar(c, dt) {
   const nearPerson = (x, z, yaw) => carPathHitsCircle(c, x, z, yaw, people, 0.02);
   rd.ghostT = Math.max(0, rd.ghostT - dt);
   rd.replanT = Math.max(0, rd.replanT - dt);
-  const state = stepDrive(c, rd.plan, dt, { maxSpeed: rd.speed, blocked: rd.ghostT > 0 ? null : blocked, slow: nearPerson, fx: !reduceMotion });
+  const state = stepDrive(c, rd.plan, dt, { maxSpeed: rd.speed, driver: RIVAL_DRIVER, blocked: rd.ghostT > 0 ? null : blocked, slow: nearPerson, fx: !reduceMotion });
   if (state === 'blocked') {
     rd.waitT = rd.plan.waitT;
     // Another car is in the way: he stops. After a moment he looks for a way round (from where he is, through the rest of the route),

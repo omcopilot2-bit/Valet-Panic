@@ -425,6 +425,83 @@ body[data-touch="true"][data-mode="rush"] .pickup-banner .plate{margin-top:3px;f
  body[data-touch="true"][data-mode="rush"] .pickup-banner .plate{font-size:clamp(8px,1.1vw,9px)}
  body[data-touch="true"] .toast{max-width:calc(100vw - 32px);padding:7px 10px;font-size:14px}
 }
+/* ---------- Mobile landscape (phones on their side): keep every bay clear, compact cards ---------- */
+@media (orientation: landscape) and (max-height: 600px) {
+  /* HUD chips: smaller, so the brief fits in the strip above the lot */
+  body[data-touch="true"] .hud{top:calc(8px + var(--safe-top));left:calc(10px + var(--safe-left));gap:6px}
+  body[data-touch="true"] .metric{min-width:0;padding:5px 10px;border-radius:12px}
+  body[data-touch="true"] .metric label{font-size:9px;letter-spacing:.06em}
+  body[data-touch="true"] .metric strong{font-size:20px;margin-top:3px}
+  body[data-touch="true"] .top-right{top:calc(8px + var(--safe-top));right:calc(10px + var(--safe-right));gap:6px}
+  body[data-touch="true"] .sound,body[data-touch="true"] .fullscreen{width:42px;height:42px;font-size:18px}
+
+  /* Duel brief: one slim two-line pill over the building, between the chips and the buttons */
+  html body[data-touch="true"][data-mode="rush"] .objective{
+    top:calc(8px + var(--safe-top));left:calc(330px + var(--safe-left));right:calc(160px + var(--safe-right));
+    transform:none;width:auto;min-width:0;max-width:none;max-height:none;height:auto;
+    padding:5px 12px;border-radius:12px;box-shadow:0 3px 0 var(--gold-d);text-align:center;overflow:hidden}
+  html body[data-touch="true"][data-mode="rush"] .call-label{font-size:9px;letter-spacing:.06em;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  html body[data-touch="true"][data-mode="rush"] .call-main{margin-top:2px;font-size:15px;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  html body[data-touch="true"][data-mode="rush"] .objective p,
+  html body[data-touch="true"][data-mode="rush"] .objective[data-info="1"] p{display:none}
+
+  /* The guest banner is folded into the brief (the 🔔 bay shows its countdown), so it never covers the lot */
+  html body[data-touch="true"][data-mode="rush"] .pickup-banner{display:none}
+
+  /* Toasts and tips: small, at the bottom edge between the controls (below the curb, clear of both rings) */
+  html body[data-touch="true"][data-mode="rush"] .toast{top:auto;bottom:calc(8px + var(--safe-bottom));left:50%;
+    transform:translateX(-50%) translateY(6px);width:max-content;max-width:max(220px,calc(100vw - 620px));
+    padding:5px 12px;border-radius:12px;border-width:1px;font-size:13px;line-height:1.2}
+  html body[data-touch="true"][data-mode="rush"] .toast.show{transform:translateX(-50%)}
+  html body[data-touch="true"][data-mode="rush"] .coach-banner{top:auto!important;bottom:calc(46px + var(--safe-bottom))!important;
+    width:max-content!important;max-width:max(220px,calc(100vw - 620px))!important;padding:5px 12px!important;font-size:12px!important;border-radius:12px!important}
+
+  /* Cards (boon picker, results, pause, level select, locker): compact, no scrolling */
+  .overlay:not(.title){padding:6px calc(8px + var(--safe-right)) 6px calc(8px + var(--safe-left))}
+  .overlay:not(.title) .hero{width:min(900px,96vw);max-height:calc(100dvh - 12px);padding:12px 20px 14px;border-radius:20px;border-width:2px;box-shadow:0 6px 0 var(--night)}
+  .overlay:not(.title) .hero-eyebrow{height:22px;padding:0 10px;font-size:10px}
+  .overlay:not(.title) .hero h1{margin-top:4px;font-size:28px!important;line-height:1.05}
+  .overlay:not(.title) .hero h1 br{display:none}
+  .overlay:not(.title) .hero p{margin-top:4px;font-size:14px;line-height:1.3}
+  .overlay:not(.title) .mods{margin-top:6px!important}
+  .overlay:not(.title) .mod{font-size:10px;padding:3px 7px}
+  .overlay:not(.title) .intro-rule{margin-top:6px;padding:5px 10px;font-size:12px;border-radius:10px}
+  .overlay:not(.title) .goals{margin-top:4px;font-size:11px;gap:10px}
+  .overlay:not(.title) .perks{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:8px}
+  .overlay:not(.title) .perk{flex-direction:column;align-items:flex-start;flex-wrap:nowrap;gap:4px;padding:8px 10px;border-radius:14px;box-shadow:0 3px 0 #06101a}
+  .overlay:not(.title) .perk b{font-size:15px}
+  .overlay:not(.title) .perk span{font-size:11px;line-height:1.25}
+  .overlay:not(.title) .perk em{margin:auto 0 0;font-size:10px}
+  .overlay:not(.title) .stars{margin-top:2px;font-size:34px}
+  .overlay:not(.title) .delta{margin-top:4px;font-size:14px}
+  .overlay:not(.title) .features{gap:6px;margin-top:0}
+  .overlay:not(.title) .feature{padding:6px 4px;border-radius:12px;font-size:9px}
+  .overlay:not(.title) .feature b{margin-bottom:4px;font-size:20px}
+  .overlay:not(.title) .breakdown{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:6px}
+  .overlay:not(.title) .breakdown div{padding:5px 2px;border-radius:10px;font-size:9px}
+  .overlay:not(.title) .breakdown b{margin-bottom:3px;font-size:16px}
+  .overlay:not(.title) .highlights{margin-top:6px;gap:4px}
+  .overlay:not(.title) .highlights span{padding:4px 8px;font-size:10px}
+  .overlay:not(.title) .unlock{margin-top:4px;font-size:11px}
+  .overlay:not(.title) .lvl{margin-top:6px}
+  .overlay:not(.title) .lvl b{font-size:14px}
+  .overlay:not(.title) .xpbar{height:8px;margin-top:4px}
+  .overlay:not(.title) .advice{display:none}
+  .overlay:not(.title) .adnote{font-size:11px;margin-top:4px}
+  body[data-touch="true"] .overlay:not(.title) .retry-hint{display:none}
+  .overlay:not(.title) .levels{gap:6px;margin-top:8px}
+  .overlay:not(.title) .lvl-card{padding:8px 10px;gap:3px}
+
+  /* Buttons side by side in one row instead of a tall stack */
+  .overlay:not(.title) .hero .play{display:inline-grid;place-items:center;width:auto;min-width:120px;height:40px!important;margin:8px 3px 0!important;padding:0 16px;font-size:16px!important;border-radius:14px;box-shadow:0 4px 0 var(--gold-d)}
+  .overlay:not(.title) .hero .play.rush{box-shadow:0 4px 0 #a83a31}
+  .overlay:not(.title) .hero .play.ghost{box-shadow:none}
+  .overlay:not(.title) .hero .play.reward{display:grid;width:100%}
+
+  /* Results: verdict on the left, numbers and buttons on the right */
+  .overlay:not(.title) .res{display:grid;grid-template-columns:1fr 1.15fr;gap:16px;align-items:center}
+  .overlay:not(.title) .res-side{min-width:0}
+}
 </style>
 <script type="importmap">{"imports":{"three":"./assets/three/three.module.js"}}</script>
 </head><body class="menu">

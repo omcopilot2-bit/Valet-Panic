@@ -19,6 +19,13 @@ export const DRIVER = {
   steerRate: 6,       // how fast the wheel moves (full lock in ~0.17 s): the lag that stops twitchy steering
   revSpeed: 3.6,      // fastest reverse
   gearPause: 0.1,     // seconds stopped when it changes gear
+  creepBase: 0.8,     // speed allowed right at the end of a stopping stretch
+  creepRate: 0.5,     // ...plus this much per metre still to go
+  brakeUse: 0.75,     // share of full braking it plans with when stopping at the end of a stretch
+  curveMin: 1.15,     // slowest it will take a bend
+  alignSlow: 0.65,    // how much it slows when its nose points away from the path (0 = not at all)
+  alignMin: 0.9,      // ...but never below this
+  crawl: 1.1,         // speed when easing past a person on foot
 };
 
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
@@ -218,6 +225,7 @@ export const planEnd = (plan) => {
 // slow(x, z, yaw) -> bool (people on foot: crawl past), fx (body roll and pitch).
 // Returns 'driving', 'blocked' (braking for something in the way) or 'done'.
 export function stepDrive(car, plan, dt, o = {}) {
+  const D = o.driver || DRIVER;   // a caller (the rival) can pass its own driver settings
   const seg = plan.segs[plan.si];
   if (plan.done || !seg) { plan.done = true; return 'done'; }
   const g = seg.gear, pts = seg.pts, cum = seg.cum, last = pts.length - 1;
@@ -251,12 +259,12 @@ export function stepDrive(car, plan, dt, o = {}) {
     const side = (car.x - pts[ka].x) * Math.cos(tangent) - (car.z - pts[ka].z) * Math.sin(tangent);   // + = displaced towards increasing yaw
     const vEff = Math.max(sp, 0.7);
     ang = wrap(tangent - travel) - Math.atan(2.4 * side / (vEff + 0.6));
-    const sf = Math.min(1, vEff / DRIVER.rollSpeed);
-    const cmd = clamp((curvature * vEff + 2.8 * ang) / (DRIVER.turnRate * sf), -1, 1);
-    plan.steer += clamp(cmd - plan.steer, -DRIVER.steerRate * dt, DRIVER.steerRate * dt);
+    const sf = Math.min(1, vEff / D.rollSpeed);
+    const cmd = clamp((curvature * vEff + 2.8 * ang) / (D.turnRate * sf), -1, 1);
+    plan.steer += clamp(cmd - plan.steer, -D.steerRate * dt, D.steerRate * dt);
 
     // speed: the slowest of the cruise speed, the next bend, the car's own heading error and the end of the route
-    const vMax = g > 0 ? o.maxSpeed : Math.min(o.maxSpeed, DRIVER.revSpeed);
+    const vMax = g > 0 ? o.maxSpeed : Math.min(o.maxSpeed, D.revSpeed);
     const horizon = 2.6 + sp * 0.8;
     let kmax = 0, h0 = null;
     for (let i = k; i + 3 <= last && cum[i] - cum[k] < horizon; i += 3) {
@@ -264,31 +272,31 @@ export function stepDrive(car, plan, dt, o = {}) {
       if (h0 !== null) kmax = Math.max(kmax, Math.abs(wrap(h1 - h0)) / Math.max(0.2, cum[i + 3] - cum[i]));
       h0 = h1;
     }
-    const vCurve = kmax > 0.02 ? Math.max(1.15, Math.sqrt(DRIVER.latAccel / kmax)) : Infinity;
-    const vAlign = Math.max(0.9, vMax * (1 - 0.65 * Math.min(1, Math.abs(ang) / 1.3)));
-    const vEnd = stops ? Math.min(Math.sqrt(2 * DRIVER.brake * 0.75 * Math.max(0, rem - 0.05)), 0.8 + rem * 0.5) : Infinity;   // and it creeps in the last metre or two
+    const vCurve = kmax > 0.02 ? Math.max(D.curveMin, Math.sqrt(D.latAccel / kmax)) : Infinity;
+    const vAlign = Math.max(D.alignMin, vMax * (1 - D.alignSlow * Math.min(1, Math.abs(ang) / 1.3)));
+    const vEnd = stops ? Math.min(Math.sqrt(2 * D.brake * D.brakeUse * Math.max(0, rem - 0.05)), D.creepBase + rem * D.creepRate) : Infinity;   // and it creeps in the last metre or two  // and it creeps in the last metre or two
     vt = Math.min(vMax, vCurve, vAlign, vEnd);
     if (rem > 0.05) vt = Math.max(vt, Math.min(0.5, vMax));   // never stall a hair short of the end
 
     // traffic: look where the car will be and stop short of anything there
     if (o.blocked) {
-      const reach = 0.75 + sp * 0.45 + sp * sp / (2 * DRIVER.brake);
+      const reach = 0.75 + sp * 0.45 + sp * sp / (2 * D.brake);
       const dirX = Math.sin(travel), dirZ = Math.cos(travel);
       if (o.blocked(car.x + dirX * reach, car.z + dirZ * reach, car.yaw)) { vt = 0; status = 'blocked'; }
     }
     // people on foot in the way: ease past at a crawl and let them step aside (cars already push walkers out of the way), never stop
     if (o.slow && status !== 'blocked') {
       const reach = 0.75 + sp * 0.45;
-      if (o.slow(car.x + Math.sin(travel) * reach, car.z + Math.cos(travel) * reach, car.yaw)) vt = Math.max(Math.min(vt, 1.1), Math.min(0.6, vMax));
+      if (o.slow(car.x + Math.sin(travel) * reach, car.z + Math.cos(travel) * reach, car.yaw)) vt = Math.max(Math.min(vt, D.crawl), Math.min(0.6, vMax));
     }
 
     // throttle and brake
-    if (plan.v < vt) plan.v = Math.min(vt, plan.v + (g > 0 ? DRIVER.accel : DRIVER.revAccel) * dt);
-    else plan.v = Math.max(vt, plan.v - DRIVER.brake * dt);
+    if (plan.v < vt) plan.v = Math.min(vt, plan.v + (g > 0 ? D.accel : D.revAccel) * dt);
+    else plan.v = Math.max(vt, plan.v - D.brake * dt);
     braking = plan.v < prevV - 0.02 * 60 * dt || (vt === 0 && plan.v < 0.2);
 
     // roll: the car only turns while it moves
-    const dyaw = plan.steer * DRIVER.turnRate * Math.min(1, plan.v / DRIVER.rollSpeed) * dt;
+    const dyaw = plan.steer * D.turnRate * Math.min(1, plan.v / D.rollSpeed) * dt;
     const mid = car.yaw + dyaw * 0.5;
     car.yaw += dyaw;
     car.x += Math.sin(mid) * plan.v * g * dt;
@@ -300,7 +308,7 @@ export function stepDrive(car, plan, dt, o = {}) {
     if (k >= last - 1 && (endD < 0.14 || past || rem < 0.05) && !(plan.flow && plan.si === plan.segs.length - 1)) {
       plan.v = 0;
       if (plan.si === plan.segs.length - 1) plan.done = true;
-      else { plan.si++; plan.k = 0; plan.pause = DRIVER.gearPause; }
+      else { plan.si++; plan.k = 0; plan.pause = D.gearPause; }
     } else if (plan.flow && plan.si === plan.segs.length - 1 && k >= last && (endD < 0.3 || past || rem < 0.05)) plan.done = true;
   }
 

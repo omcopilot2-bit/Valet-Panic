@@ -40,7 +40,8 @@ export function updateRushHUD() {
   const pl = rush.pl;
   const bayName = (sl) => String(sl ? sl.id : 0).padStart(2, '0');
   if (G.activeCar && G.activeCar.delivering) {
-    ui.callLabel.textContent = 'GUEST WAITING · DRIVE TO PICK-UP';
+    const dc = G.activeCar.call;
+    ui.callLabel.textContent = 'GUEST WAITING · DRIVE TO PICK-UP' + (dc && !tutorial.on ? ` · ${Math.max(0, Math.ceil(dc.left))}s` : '');
     ui.callMain.textContent = 'Green ring → right side';
   } else if (G.activeCar && G.activeCar.slot) {
     const nx = rush.nextSlot && !rush.nextSlot.car ? ' → ' + String(rush.nextSlot.id).padStart(2, '0') : '';
@@ -49,8 +50,7 @@ export function updateRushHUD() {
   } else {
     const parts = [];
     if (rush.waiting) parts.push(`🔑 Bay ${bayName(rush.waiting.slot)}${tutorial.on ? '' : ` · ${Math.max(0, Math.ceil(rush.waiting.waitLeft))}s`}`);
-    for (const call of rush.calls) if (call.state === 'waiting') parts.push(`🔔 Bay ${bayName(call.slot || call.car.slot)}`);
-    ui.callLabel.textContent = parts.length ? 'ON FOOT · RUN TO A CAR' : 'ON FOOT · NEXT GUEST COMING';
+    for (const call of rush.calls) if (call.state === 'waiting') parts.push(`🔔 Bay ${bayName(call.slot || call.car.slot)}`);    for (const call of rush.calls) if (call.state === 'waiting') parts.push(`🔔 Bay ${bayName(call.slot || call.car.slot)}${tutorial.on ? '' : ` · ${Math.max(0, Math.ceil(call.left))}s`}`);    ui.callLabel.textContent = parts.length ? 'ON FOOT · RUN TO A CAR' : 'ON FOOT · NEXT GUEST COMING';
     ui.callMain.textContent = parts.length ? parts.join('  ·  ') : 'Hang tight…';
   }
   if (rush.sceneLab) {

@@ -60,6 +60,7 @@ export function showShiftResults(r, go) {
     + (mini ? `<div class="unlock">🎯 Mini-goal: ${mini.text} ${miniDone ? '✓ +25 XP' : '✗'}</div>` : '');
 
   showCard(`
+    <div class="res"><div class="res-side">
     <div class="hero-eyebrow">SHIFT ${lv.id} · ${lv.name.toUpperCase()}</div>
     <h1 style="font-size:clamp(34px,6vw,48px)">${stars ? 'You <em>win!</em>' : margin === 0 ? 'Dead <em>heat.</em>' : 'Rival <em>wins.</em>'}</h1>
     <div class="stars" aria-label="${stars} of 3 stars">${[1, 2, 3].map((i) => `<span class="${i <= stars ? 'on' : ''}" style="--i:${i}">★</span>`).join('')}</div>
@@ -68,6 +69,7 @@ export function showShiftResults(r, go) {
     ${cleared ? `<p class="delta up">Every guest served · clean-lot bonus +$${clearBonus}</p>` : '<p class="delta down">Time ran out with cars still in the lot</p>'}
     ${toNext}
     ${bestNote}
+    </div><div class="res-side">
     <div class="features">
       <div class="feature"><b>$${G.score}</b>TIPS</div>
       <div class="feature"><b>$${best}</b>SHIFT BEST</div>
@@ -90,6 +92,7 @@ export function showShiftResults(r, go) {
     <button class="play ghost" id="mainMenu" style="margin-top:10px">Main menu</button>
     <div class="retry-hint">PRESS SPACE OR ENTER TO ${next ? 'CONTINUE' : 'RETRY'}</div>
     <div class="advice">💡 ${adviceFor(st)}</div>
-    ${levelBlock(prog)}`,
+    ${levelBlock(prog)}
+    </div></div>`,
   { ...(go.next ? { next: go.next } : {}), ...(go.reward && go.reward.state === 'ready' ? { rewardXp: () => claimReward(go.reward) } : {}), again: go.again, menu: showLevelSelect, mainMenu: showTitle });
 }
