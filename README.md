@@ -152,7 +152,7 @@ Flat ES modules; no production bundler or root npm scripts are configured. Serve
 - Pilot layouts: Shift 3 uses two inward-facing casino rows around a central fountain, with a clear side aisle for departures; Shift 5 uses opposing bay columns around a central opera carpet, and Shift 6 uses parallel airport kerb-side rows. Shift-specific bay centres and headings are in `config.js`.
 - Main menu button on the end screen restores the title screen.
 - Reduced-motion users get no screen shake, red flash or particles. Pinch-zoom is no longer disabled.
-- Quality: devices with 4 GB RAM or less, 4 cores or fewer, or a touch screen start in a lighter mode (pixel ratio 1, 1024 shadow map). Any device drops to it after about six seconds under 40 fps.
+- Quality: devices with 4 GB RAM or less, 4 cores or fewer, or a touch screen start in a lighter shadow mode. Touch displays retain up to a 2.25 pixel ratio in that mode for sharper rendering; any device drops to lighter shadows after about six seconds under 40 fps.
 - Game feel: dust trails (blue with nitro), crash sparks, a squash on crashes and parks, and an expanding ring on parks and hand-offs.
 
 ## Tests
@@ -161,6 +161,8 @@ Flat ES modules; no production bundler or root npm scripts are configured. Serve
 `node tests/audio.mjs` verifies that both upshifts produce a strong engine-pitch reset, a gear-following harmonic, a short descending shift cue, and an output dip, using a mocked Web Audio context.
 
 `node tests/platform.mjs` checks CrazyGames loading events, settings updates, system information, disabled-ad fallback, account-authoritative saves, and guest-only legacy migration with a mocked SDK.
+
+`node --import ./tests/sim/register.mjs tests/rival-drive.mjs` checks that the rival faces its route directly and takes the short turn across the angle boundary.
 
 `tests/sim` is a headless liveness test: it runs the real Shifts logic (arrivals, calls, the rival, closing time) on stand-in graphics, for every shift, with an idle player, a player who parks one car and leaves, a slow player and a fast bot, and fails if a shift stops making progress or the bay/car bookkeeping goes wrong. Install its declared test dependency and run it after changing shift logic:
 ```
@@ -176,7 +178,7 @@ It cannot test driving feel, collisions, player-input feel or visuals.
 - Fixed in this round: a full lot froze every shift if you had parked fewer than 2 cars yourself (the call timer only counted your own parks, and the rival now parks too).
 - Rival routes are deterministic; the headless simulation does not measure whether the opponent feels fair or fun.
 - Classic retune is untested.
-- There are no automated driving-feel, collision or visual-regression tests.
+- Rival steering has a focused heading-alignment regression test; driving feel across all layouts, collision edge cases and visuals still need hands-on testing.
 - CrazyGames cover source illustrations are in `assets/covers/`; raster export, preview video, portal upload and final QA remain submission steps.
 - Fredoka and Nunito are bundled as WOFF2 files under `assets/fonts/`; their SIL Open Font Licenses are included beside them.
 

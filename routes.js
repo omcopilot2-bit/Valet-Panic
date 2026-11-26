@@ -69,23 +69,52 @@ export function parkRoute(slot, parkYaw) {
   if (Number.isFinite(slot.layoutYaw)) {
     return [layoutMouth(slot, parkYaw), { x: slot.x, z: slot.z, yaw: parkYaw }];
   }
-  const pts = slot.z > 0
-    ? [{ x: slot.x, z: LANE_CROSS }, { x: slot.x, z: slot.z, yaw: parkYaw }]
-    : [{ x: SIDE_L, z: 5.2 }, { x: SIDE_L, z: LANE_BACK }, { x: slot.x, z: LANE_BACK }];
-  if (slot.z < 0) pts.push({ x: slot.x, z: slot.z, yaw: parkYaw });
+  const bottom = slot.z > 0;
+  const backIn = Math.cos(parkYaw) > 0.01;   // nose-out bays: the car has to reverse in
+  const lane = bottom ? LANE_CROSS : LANE_BACK;
+  // Reversing in: drive past the bay, stop, then back round into it (a pinned heading that points away from the way the car
+  // travels makes the driver reverse the last stretch by itself).
+  const swing = backIn ? [{ x: slot.x + 1.9, z: bottom ? 4.9 : LANE_BACK }, { x: slot.x, z: bottom ? 3.7 : -2.0, rev: true }] : [];
+  const pts = bottom
+    ? (backIn ? swing : [{ x: slot.x, z: 4.5 }])
+    : [{ x: SIDE_L, z: 5.2 }, { x: SIDE_L, z: LANE_BACK }, ...(backIn ? swing : [{ x: slot.x - 1.2, z: LANE_BACK + 0.45 }, { x: slot.x, z: LANE_BACK }])];
+  pts.push({ x: slot.x, z: slot.z, yaw: parkYaw });
   return pts;
+}
+
+// Last stretch into the PICK-UP ring (x 10.4, facing +x like the player). Coming from the west it is one straight roll in,
+// so the car arrives already pointing the right way. Coming down the right-hand column (top-row bays) it swings in and
+// stops facing south. The old route ran on to x 11.4 first and then slid back into the ring while spinning on the spot.
+const RING_LEAD = 2.6;
+export function ringApproach(fromX) {
+  if (fromX <= HANDOFF.x - 1.2) {
+    const lead = { x: HANDOFF.x - RING_LEAD, z: HANDOFF.z };
+    return (fromX < lead.x - 0.8 ? [lead] : []).concat([{ x: HANDOFF.x, z: HANDOFF.z }]);
+  }
+  return [{ x: HANDOFF.x, z: HANDOFF.z - 0.9 }, { x: HANDOFF.x, z: HANDOFF.z }];
 }
 
 // Driving route from a bay to the PICK-UP ring: back out first (heading pinned), then round the open lanes.
 export function deliverRoute(slot, carYaw) {
   if (Number.isFinite(slot.layoutYaw)) {
     const mouth = { ...layoutMouth(slot, carYaw), yaw: carYaw };
-    return [mouth, ...layoutAisle(slot, mouth), { x: HANDOFF.x, z: HANDOFF.z, yaw: Math.PI / 2 }];
+    const aisle = layoutAisle(slot, mouth);
+    // The aisle may end east of the ring: the last node then rolls in without a pinned heading (a pinned one made the car spin on the spot).
+    return [mouth, ...aisle, { x: HANDOFF.x, z: HANDOFF.z }];
   }
-  if (slot.z > 0) {
-    return [{ x: slot.x, z: LANE_CROSS, yaw: carYaw }, { x: SIDE_R, z: LANE_CROSS }, { x: SIDE_R, z: 4.8 }, { x: HANDOFF.x, z: HANDOFF.z, yaw: Math.PI / 2 }];
-  }
-  return [{ x: slot.x, z: LANE_BACK, yaw: carYaw }, { x: SIDE_R, z: LANE_BACK }, { x: SIDE_R, z: 4.8 }, { x: HANDOFF.x, z: HANDOFF.z, yaw: Math.PI / 2 }];
+  const bottom = slot.z > 0;
+  // A nose-in car backs out straight, then keeps reversing along the aisle: the curve swings its nose round to face the ring,
+  // so it can drive off forwards with room to spare. A nose-out car just drives out.
+  const backing = Math.cos(carYaw) < -0.01;
+  const lane = bottom ? 4.9 : LANE_BACK;
+  const out = backing
+    // swing as far as 2.4, but never into the props on the left
+    ? [{ x: slot.x, z: lane, rev: true }, { x: slot.x - Math.max(0.9, Math.min(2.4, slot.x + 11)), z: lane, rev: true }]
+    : [{ x: slot.x, z: lane }];
+  const outX = out[out.length - 1].x;
+  if (bottom) return [...out, ...ringApproach(outX)];
+  // Top row: along the gap between the rows to the right-hand column, down it, then into the ring.
+  return [...out, { x: SIDE_R, z: LANE_BACK }, { x: SIDE_R, z: LANE_CROSS }, ...ringApproach(SIDE_R)];
 }
 
 export function customExitRoute(slot) {

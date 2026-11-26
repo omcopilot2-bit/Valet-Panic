@@ -1,6 +1,6 @@
 // The rival valet: an AI opponent that races you for the same cars. Split out of shifts.js; it only reads and writes the shared `rush` / `cars` state.
-import * as THREE from 'three';
-import { BOUNDS, HANDOFF, PARKED_HALF } from './config.js';
+import { buildPlan, clearanceFn, routeAround, stepDrive } from './autodrive.js';
+import { HANDOFF, PARKED_HALF, reduceMotion } from './config.js';
 import { carPathBlocked, carPathHitsCircle } from './collision.js';
 import { audio, bubble, parkYaw, popScore, worldToScreen } from './core.js';
 import { ringBurst } from './fx.js';
@@ -14,122 +14,33 @@ import { updateRushHUD } from './hud.js';
 /* ---------- the rival valet: an AI opponent racing you for the same cars ---------- */
 // He takes keys at the drop-off and hands cars over at the pick-up, exactly like you. Whoever reaches a car first gets it.
 // Every park and every return counts one point; when the shift ends, more points than the rival means you win.
-const GRID_CLEAR = 1.05;   // A* obstacle clearance (1.35 was wider than the aisles and left the rival boxed in)
 const RIVAL_HOME = { x: -6.2, z: 7.5 };
 const RIVAL_LINES = ['Too slow!', 'Mine!', 'Thanks, rookie!', 'Beep beep!', 'Keys, please!'];
+// His cruise speed is rv.drive x this. The shared driver brakes for bends, reverses and creeps into bays like a person would,
+// so a trip takes ~2 s longer than the old fixed-speed slide; raise this to make him quicker, lower it to ease him off.
+const RIVAL_PACE = 1.3;
 
-function gridPath(from, to, obstacles) {
-  const step = 0.45;
-  const minX = Math.floor(BOUNDS.minX / step), maxX = Math.ceil(BOUNDS.maxX / step);
-  const minZ = Math.floor(BOUNDS.minZ / step), maxZ = Math.ceil(BOUNDS.maxZ / step);
-  const start = { x: Math.round(from.x / step), z: Math.round(from.z / step) };
-  const goal = { x: Math.round(to.x / step), z: Math.round(to.z / step) };
-  const key = (x, z) => `${x},${z}`;
-  const blocked = (x, z) => {
-    const px = x * step, pz = z * step;
-    return obstacles.some((o) => {
-      if (o.halfX !== undefined && o.halfZ !== undefined) {
-        const qx = Math.max(o.x - o.halfX, Math.min(px, o.x + o.halfX));
-        const qz = Math.max(o.z - o.halfZ, Math.min(pz, o.z + o.halfZ));
-        return Math.hypot(px - qx, pz - qz) < GRID_CLEAR;
-      }
-      return Math.hypot(px - o.x, pz - o.z) < o.r + GRID_CLEAR;
-    });
-  };
-  if (blocked(start.x, start.z) || blocked(goal.x, goal.z)) return null;
-
-  const startKey = key(start.x, start.z), goalKey = key(goal.x, goal.z);
-  const open = [{ ...start, g: 0, f: Math.hypot(goal.x - start.x, goal.z - start.z) }];
-  const scores = new Map([[startKey, 0]]);
-  const parents = new Map();
-  const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
-
-  while (open.length) {
-    let best = 0;
-    for (let i = 1; i < open.length; i++) if (open[i].f < open[best].f) best = i;
-    const current = open.splice(best, 1)[0];
-    const currentKey = key(current.x, current.z);
-    if (current.g !== scores.get(currentKey)) continue;
-    if (currentKey === goalKey) {
-      const path = [];
-      let at = goalKey;
-      while (at !== startKey) {
-        const [x, z] = at.split(',').map(Number);
-        path.push({ x: x * step, z: z * step });
-        at = parents.get(at);
-      }
-      path.reverse();
-      return path;
-    }
-
-    for (const [dx, dz] of dirs) {
-      const x = current.x + dx, z = current.z + dz;
-      if (x < minX || x > maxX || z < minZ || z > maxZ || blocked(x, z)) continue;
-      if (dx && dz && (blocked(current.x + dx, current.z) || blocked(current.x, current.z + dz))) continue;
-      const nextKey = key(x, z);
-      const g = current.g + (dx && dz ? Math.SQRT2 : 1);
-      if (g >= (scores.get(nextKey) ?? Infinity)) continue;
-      scores.set(nextKey, g);
-      parents.set(nextKey, currentKey);
-      open.push({ x, z, g, f: g + Math.hypot(goal.x - x, goal.z - z) });
-    }
-  }
-  return null;
-}
-
-// Collapse the grid's 0.45-unit stair steps into long, clear segments so steering does not twitch at every node.
-function smoothGridPath(from, path, obstacles) {
-  const clearSegment = (a, b) => {
-    const dx = b.x - a.x, dz = b.z - a.z;
-    const steps = Math.max(1, Math.ceil(Math.hypot(dx, dz) / 0.18));
-    for (let i = 1; i <= steps; i++) {
-      const f = i / steps, x = a.x + dx * f, z = a.z + dz * f;
-      if (obstacles.some((o) => {
-        if (o.halfX !== undefined && o.halfZ !== undefined) {
-          const qx = Math.max(o.x - o.halfX, Math.min(x, o.x + o.halfX));
-          const qz = Math.max(o.z - o.halfZ, Math.min(z, o.z + o.halfZ));
-          return Math.hypot(x - qx, z - qz) < GRID_CLEAR;
-        }
-        return Math.hypot(x - o.x, z - o.z) < o.r + GRID_CLEAR;
-      })) return false;
-    }
-    return true;
-  };
-  const result = [];
-  let anchor = from, i = 0;
-  while (i < path.length) {
-    let furthest = i;
-    for (let j = i; j < path.length; j++) {
-      if (!clearSegment(anchor, path[j])) break;
-      furthest = j;
-    }
-    result.push(path[furthest]);
-    anchor = path[furthest];
-    i = furthest + 1;
-  }
-  return result;
-}
-
-function routeAroundLevelProps(car, route) {
-  const obstacles = [
+// Everything solid he has to steer round: level props, closed bays and every other car.
+function obstaclesFor(car) {
+  return [
     ...G.colliders.filter((o) => !o.disabled),
     ...slots.filter((s) => s.closed).map((s) => ({ x: s.x, z: s.z, r: Math.hypot(PARKED_HALF.x, PARKED_HALF.z) })),
     ...[...cars].filter((o) => o !== car).map((o) => ({ x: o.x, z: o.z, r: 1.0 })),
   ];
-  if (!obstacles.length) return route;
-  const path = [];
-  let from = { x: car.x, z: car.z };
-  for (const point of route) {
-    const leg = gridPath(from, point, obstacles);
-    if (!leg) {
-      // A moving car can temporarily occupy the target; the driver waits and replans on the next clear window.
-      path.push(point);
-    } else {
-      path.push(...smoothGridPath(from, leg, obstacles), point);
-    }
-    from = point;
-  }
-  return path;
+}
+
+// The part of a route still to drive: from the node nearest the car on (a replan must not restart the manoeuvre from scratch).
+function remainingRoute(car, route) {
+  let best = 0, bestD = Infinity;
+  route.forEach((n, i) => { const d = Math.hypot(n.x - car.x, n.z - car.z); if (d < bestD) { bestD = d; best = i; } });
+  if (bestD < 0.8 && best < route.length - 1) best++;
+  return route.slice(best);
+}
+
+// A smooth, drivable plan from where the car is now through the route (see autodrive.js).
+function planDrive(car, route) {
+  const obstacles = obstaclesFor(car);
+  return buildPlan(car, routeAround(car, route, obstacles), { clear: clearanceFn(obstacles) });
 }
 
 export function newRival(lv) {
@@ -234,11 +145,13 @@ function rivalTake(t) {
     car.waiting = false;
     rush.spawnIn = 3 + rush.lv.gap * 4;
     car.vipActive = false;
-    car.rivalDrive = { kind: 'park', path: routeAroundLevelProps(car, parkRoute(s, parkYaw(s))), i: 0, speed: rv.drive, steer: 0 };
+    const route = parkRoute(s, parkYaw(s));
+    car.rivalDrive = { kind: 'park', route, plan: planDrive(car, route), speed: rv.drive * RIVAL_PACE, waitT: 0, ghostT: 0, replanT: 0, age: 0 };
   } else {
     t.call.state = 'rival';
     t.call.slot = s;
-    car.rivalDrive = { kind: 'deliver', call: t.call, path: routeAroundLevelProps(car, deliverRoute(s, car.yaw)), i: 0, speed: rv.drive, steer: 0 };
+    const route = deliverRoute(s, car.yaw);
+    car.rivalDrive = { kind: 'deliver', call: t.call, route, plan: planDrive(car, route), speed: rv.drive * RIVAL_PACE, waitT: 0, ghostT: 0, replanT: 0, age: 0 };
     if (s) s.car = null;
     car.slot = null;
     car.parked = false;
@@ -249,44 +162,30 @@ function rivalTake(t) {
 }
 
 export function stepRivalCar(c, dt) {
-  const rd = c.rivalDrive, n = rd.path[rd.i];
-  const dx = n.x - c.x, dz = n.z - c.z, d = Math.hypot(dx, dz);
-  const want = n.yaw !== undefined ? n.yaw : d > 0.05 ? Math.atan2(dx, dz) : c.yaw;
-  const diff = Math.atan2(Math.sin(want - c.yaw), Math.cos(want - c.yaw));
-  const desiredSteer = THREE.MathUtils.clamp(diff * 2.4, -3.2, 3.2);
-  rd.steer = THREE.MathUtils.clamp(rd.steer || 0, desiredSteer - 7 * dt, desiredSteer + 7 * dt);
-  const yawStep = THREE.MathUtils.clamp(rd.steer * dt, Math.min(0, diff), Math.max(0, diff));
-  const nextYaw = c.yaw + yawStep;
-  const turn = Math.min(1, Math.abs(diff) / 1.2);
-  const step = rd.speed * (1 - turn * 0.4) * dt;
-  const nextX = d <= step ? n.x : c.x + dx / d * step;
-  const nextZ = d <= step ? n.z : c.z + dz / d * step;
-  const peopleWithRightOfWay = otherPeople(null).filter((p) => p.fig?.role === 'valet' || p.fig?.role === 'rival');
-  if (carPathBlocked(c, nextX, nextZ, nextYaw, cars, 0.08)
-    || carPathHitsCircle(c, nextX, nextZ, nextYaw, [...G.colliders, ...peopleWithRightOfWay], 0.08)) {
-    rd.waitT = (rd.waitT || 0) + dt;
-    c.speed = c.vx = c.vz = 0;                      // the AI yields; it never forces its way through a valet's car
+  const rd = c.rivalDrive;
+  rd.age += dt;
+  // The route already goes round every prop and parked car, so only things that MOVE can stop him: other cars on the move.
+  // Valets on foot only make him crawl (cars push walkers aside), so a figure standing beside the car never traps it in a tight spot.
+  const movers = [...cars].filter((o) => o !== c && !o.parked);
+  const people = otherPeople(null).filter((p) => p.fig?.role === 'valet' || p.fig?.role === 'rival');
+  const blocked = (x, z, yaw) => carPathBlocked(c, x, z, yaw, movers, 0.08);
+  const nearPerson = (x, z, yaw) => carPathHitsCircle(c, x, z, yaw, people, 0.02);
+  rd.ghostT = Math.max(0, rd.ghostT - dt);
+  rd.replanT = Math.max(0, rd.replanT - dt);
+  const state = stepDrive(c, rd.plan, dt, { maxSpeed: rd.speed, blocked: rd.ghostT > 0 ? null : blocked, slow: nearPerson, fx: !reduceMotion });
+  if (state === 'blocked') {
+    rd.waitT = rd.plan.waitT;
+    // Another car is in the way: he stops. After a moment he looks for a way round (from where he is, through the rest of the route),
+    // and after a second more he eases through anyway, so the duel can never deadlock.
     if (rd.waitT > 0.45 && !rd.replanT) {
-      const goal = rd.path[rd.path.length - 1];
-      const detour = routeAroundLevelProps(c, [goal]);
-      if (detour && detour.length) { rd.path = detour; rd.i = 0; }
+      rd.plan = planDrive(c, remainingRoute(c, rd.route));
       rd.replanT = 1.0;
     }
-    rd.replanT = Math.max(0, (rd.replanT || 0) - dt);
-    if (rd.waitT < 3) return;                       // still yielding; after 3 s he creeps on so two cars can never deadlock
-  } else rd.waitT = 0;
-  rd.waitT = rd.waitT > 3 ? rd.waitT : 0;
-  rd.replanT = Math.max(0, (rd.replanT || 0) - dt);
-  const oldX = c.x, oldZ = c.z;
-  c.yaw = nextYaw;
-  c.x = nextX; c.z = nextZ;
-  if (d <= step) rd.i++;
-  c.vx = dt > 0 ? (c.x - oldX) / dt : 0;
-  c.vz = dt > 0 ? (c.z - oldZ) / dt : 0;
-  c.speed = Math.hypot(c.vx, c.vz);
+    if (rd.waitT > 1.5) rd.ghostT = 1.2;
+  }
   c.root.position.set(c.x, 0.045, c.z);
   c.root.rotation.y = c.yaw;
-  if (rd.i >= rd.path.length) finishRivalCar(c);
+  if (state === 'done' || rd.age > 45) finishRivalCar(c);   // a drive can never take forever
 }
 
 function rivalExit(x, z) {

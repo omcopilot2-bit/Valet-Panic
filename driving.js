@@ -1,5 +1,6 @@
 // Driving physics, collisions and the helpers shared by both modes (snap-into-bay, exit, bay highlights).
 import * as THREE from 'three';
+import { buildPlan, clearanceFn, routeAround, stepDrive } from './autodrive.js';
 import { CAR_BODY_OFFSETS, CAR_BODY_RADIUS, carPathBlocked, carPathHitsCircle, circleVsCollider, circleVsParkingBox, separationNormal } from './collision.js';
 import { angleDifference, BOUNDS, PARKED_HALF, reduceMotion } from './config.js';
 import { audio, gripOf, parkRadius, parkSpeed, parkYaw, toast } from './core.js';
@@ -23,63 +24,48 @@ export function hornTick(car, dt) {
   }
 }
 
-const wrapAngle = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
-// Leaves its bay (nose-in cars reverse out, nose-out cars drive out), straightens up in the lane, then turns right and drives off.
-// The heading always turns smoothly: it never snaps.
-export function stepExit(car, dt) {
-  let nextX = car.x, nextZ = car.z, nextYaw = car.yaw;
-  let routeComplete = false;
-  if (car.exitRoute && car.exitRoute.length) {
-    let i = car.exitRouteIndex || 0;
-    let target = car.exitRoute[i];
-    let dx = target.x - car.x, dz = target.z - car.z;
-    let d = Math.hypot(dx, dz);
-    if (d < 0.28 && i < car.exitRoute.length - 1) {
-      car.exitRouteIndex = ++i;
-      target = car.exitRoute[i];
-      dx = target.x - car.x;
-      dz = target.z - car.z;
-      d = Math.hypot(dx, dz);
-    }
-    const want = target.yaw !== undefined ? target.yaw : d > 0.05 ? Math.atan2(dx, dz) : car.yaw;
-    const diff = wrapAngle(want - car.yaw);
-    nextYaw += Math.max(-3 * dt, Math.min(3 * dt, diff));
-    const turn = Math.min(1, Math.abs(diff) / 1.2);
-    const step = 4.2 * (1 - turn * 0.35) * dt;
-    nextX = d <= step ? target.x : car.x + dx / d * step;
-    nextZ = d <= step ? target.z : car.z + dz / d * step;
-    routeComplete = i === car.exitRoute.length - 1 && d <= step;
-  } else
-  if (car.z < car.exitLane - 0.02) {
-    // line the car up with the bay axis (nearest of 0 / PI), and only roll once it is roughly straight
-    const axis = Math.cos(car.yaw) >= 0 ? 0 : Math.PI;
-    const diff = wrapAngle(axis - car.yaw);
-    nextYaw += Math.max(-3 * dt, Math.min(3 * dt, diff));
-    const align = Math.max(0, (Math.abs(Math.cos(nextYaw)) - 0.35) / 0.65);
-    nextZ = Math.min(car.exitLane, car.z + 3.8 * dt * align);
-  } else {
-    const diff = wrapAngle(Math.PI / 2 - car.yaw);
-    nextYaw += Math.max(-3 * dt, Math.min(3 * dt, diff));
-    nextX += 4.8 * dt * Math.max(0.25, Math.sin(nextYaw));
+// Where a car that is leaving the lot drives: a venue's own exit route, or out of its bay and along its exit lane to the right.
+// A nose-in car backs out and keeps reversing along the lane, so its nose swings round to face the exit and it drives off forwards.
+function exitNodes(car) {
+  if (car.exitRoute && car.exitRoute.length) return car.exitRoute;
+  const lane = car.exitLane, nodes = [];
+  if (car.z < lane - 0.02) {
+    if (Math.cos(car.yaw) < -0.2) {
+      const zr = Math.min(lane, car.z + 4.4);   // back out just far enough to clear the bay, not the whole way to the far lane
+      nodes.push({ x: car.x, z: zr, rev: true }, { x: car.x - Math.max(0.9, Math.min(2.2, car.x + 11)), z: zr, rev: true });
+      if (zr < lane - 0.3) nodes.push({ x: car.x + 3, z: lane });
+    } else nodes.push({ x: car.x + 3, z: lane });
   }
-  // The valet who just climbed out stands beside this same car; don't let that scripted hand-off pose trap it.
-  const peopleWithRightOfWay = otherPeople(null).filter((p) => (p.fig?.role === 'valet' || p.fig?.role === 'rival') && p.fig !== car.exitIgnoreFigure);
-  if (carPathBlocked(car, nextX, nextZ, nextYaw, cars, 0.08)
-    || carPathHitsCircle(car, nextX, nextZ, nextYaw, [...G.colliders, ...peopleWithRightOfWay], 0.08)) {
-    car.speed = car.vx = car.vz = 0;             // delivery traffic waits until the lane is clear...
-    car.blockT = (car.blockT || 0) + dt;
-    if (car.blockT < 2.2) return false;          // ...but never forever: after a couple of seconds it creeps through (no deadlocks)
-  } else car.blockT = 0;
-  const oldX = car.x, oldZ = car.z;
-  car.x = nextX; car.z = nextZ; car.yaw = nextYaw;
-  car.vx = dt > 0 ? (nextX - oldX) / dt : 0;
-  car.vz = dt > 0 ? (nextZ - oldZ) / dt : 0;
-  car.speed = Math.hypot(car.vx, car.vz);
+  nodes.push({ x: 17, z: lane });
+  return nodes;
+}
+
+// Drives the car off (see autodrive.js). Returns true once it has left the lot.
+export function stepExit(car, dt) {
+  if (!car.exitPlan) {
+    const obstacles = [
+      ...G.colliders.filter((o) => !o.disabled),
+      ...slots.filter((s) => s.closed).map((s) => ({ x: s.x, z: s.z, r: Math.hypot(PARKED_HALF.x, PARKED_HALF.z) })),
+      // parked cars as the boxes they are, so a detour round a prop cannot clip a neighbour's bumper
+      ...[...cars].filter((o) => o !== car && o.parked && o.slot).map((o) => ({ x: o.x, z: o.z, r: 1.0, halfX: PARKED_HALF.x, halfZ: PARKED_HALF.z })),
+    ];
+    car.exitPlan = buildPlan(car, routeAround(car, exitNodes(car), obstacles), { clear: clearanceFn(obstacles), flow: true });
+  }
+  // Props and parked cars are already planned round, so only cars on the move can stop it. Valets on foot (including the one who
+  // just climbed out and stands beside this same car) only make it crawl: walkers get pushed aside, so it is never trapped in a tight spot.
+  const movers = [...cars].filter((o) => o !== car && !o.parked);
+  const people = otherPeople(null).filter((p) => (p.fig?.role === 'valet' || p.fig?.role === 'rival') && p.fig !== car.exitIgnoreFigure);
+  const blocked = (x, z, yaw) => carPathBlocked(car, x, z, yaw, movers, 0.08);
+  const nearPerson = (x, z, yaw) => carPathHitsCircle(car, x, z, yaw, people, 0.02);
+  car.exitGhostT = Math.max(0, (car.exitGhostT || 0) - dt);
+  const state = stepDrive(car, car.exitPlan, dt, { maxSpeed: 4.8, blocked: car.exitGhostT > 0 ? null : blocked, slow: nearPerson, fx: !reduceMotion });
+  // Delivery traffic waits for another car, but never for long: after a moment it eases through (no deadlocks).
+  if (state === 'blocked' && car.exitPlan.waitT > 1.5) car.exitGhostT = 1.2;
   car.root.position.set(car.x, 0.045, car.z);
   car.root.rotation.y = car.yaw;
   if (car.x > 15) car.exitIgnoreFigure = null;
-  return car.exitRoute && car.exitRoute.length ? routeComplete : car.x > 15;
+  return state === 'done' || car.x > 15;
 }
 
 export function stepSnap(dt) {

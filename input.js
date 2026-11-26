@@ -34,7 +34,10 @@ function resetSteering() {
   const wheel = $('#steeringWheel');
   if (wheel) wheel.style.transform = 'rotate(0deg)';
   const control = $('#steerControl');
-  if (control) control.setAttribute('aria-valuenow', '0');
+  if (control) {
+    control.classList.remove('is-turning');
+    control.setAttribute('aria-valuenow', '0');
+  }
 }
 
 function resetPedals() {
@@ -222,14 +225,15 @@ export function addControls() {
       steerAccumulatedAngle += delta;
     }
     steerLastAngle = angle;
-    touchInput.steerTarget = clamp(steerStartValue - steerAccumulatedAngle / (Math.PI * 2), -1, 1);
-    steeringWheel.style.transform = `rotate(${-touchInput.steerTarget * 720}deg)`;
+    touchInput.steerTarget = clamp(steerStartValue - steerAccumulatedAngle / (Math.PI * 4 / 3), -1, 1);
+    steeringWheel.style.transform = `rotate(${-touchInput.steerTarget * 270}deg)`;
     steerControl.setAttribute('aria-valuenow', String(Math.round(touchInput.steerTarget * 100)));
   };
   steerControl.addEventListener('pointerdown', (e) => {
     if (mobileControls.dataset.state !== 'driving') return;
     e.preventDefault();
     steerPointer = e.pointerId;
+    steerControl.classList.add('is-turning');
     steerStartValue = touchInput.steer;
     steerAccumulatedAngle = 0;
     steerLastAngle = null;
@@ -243,6 +247,7 @@ export function addControls() {
       steerPointer = null;
       steerLastAngle = null;
       touchInput.steerTarget = 0;
+      steerControl.classList.remove('is-turning');
       steeringWheel.style.transform = 'rotate(0deg)';
       steerControl.setAttribute('aria-valuenow', '0');
     });

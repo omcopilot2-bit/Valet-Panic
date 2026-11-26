@@ -17,6 +17,10 @@ import { buildWorld, initLights } from './world.js';
 
 const platformExpected = platform.shouldLoadSDK();
 const platformReady = platform.initPlatform();
+const touchCapable = navigator.maxTouchPoints > 0
+  || 'ontouchstart' in window
+  || matchMedia('(any-pointer: coarse)').matches;
+document.body.dataset.touch = String(touchCapable);
 let saveReady = !platformExpected;
 let assetsReady = false;
 let cameraFocus = { x: 0, z: -1.7 };
@@ -140,7 +144,10 @@ function resize() {
   const W = canvas.clientWidth || innerWidth, H = canvas.clientHeight || innerHeight, aspect = W / H;
   const portrait = aspect < 0.9 && (G.mode === 'rush' || Boolean(G.activeCar));
   cameraUsesPortraitFollow = portrait;
-  const pixelRatio = Math.min(window.devicePixelRatio || 1, quality === 'low' ? 1.75 : 2);
+  const pixelRatioCap = touchCapable
+    ? (quality === 'low' ? 2.25 : 2.5)
+    : (quality === 'low' ? 1.75 : 2);
+  const pixelRatio = Math.min(window.devicePixelRatio || 1, pixelRatioCap);
   if (renderer.getPixelRatio() !== pixelRatio) renderer.setPixelRatio(pixelRatio);
   renderer.setSize(W, H, false);
   if (!portrait) cameraFocus = { x: 0, z: -1.7 };

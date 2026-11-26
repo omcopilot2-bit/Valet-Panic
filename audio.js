@@ -547,7 +547,7 @@ export function createAudio(initiallyOn = true) {
         M.bus.connect(master);
       }
       M.bus.gain.cancelScheduledValues(ctx.currentTime);
-      M.bus.gain.setTargetAtTime(0.16, ctx.currentTime, 0.3);
+      M.bus.gain.setTargetAtTime(0.22, ctx.currentTime, 0.3);
       if (M.running) return;
       M.running = true;
       M.step = 0;
@@ -630,9 +630,9 @@ export function createAudio(initiallyOn = true) {
       });
 
       const norm = Math.max(0, Math.min(1, (rpm - profile.idle) / (profile.redline - profile.idle)));
-      engineGain.gain.setTargetAtTime((0.2 + norm * 0.2) * (0.6 + 0.4 * load), t, 0.08);
+      engineGain.gain.setTargetAtTime((0.28 + norm * 0.2) * (0.7 + 0.3 * load), t, 0.08);
       engineFilter.frequency.setTargetAtTime((profile.cutoff + speed * profile.rise) * 2 * (0.55 + 0.45 * load), t, 0.12);
-      roadGain.gain.setTargetAtTime(Math.pow(Math.min(speed / 5.6, 1), 1.5) * 0.05, t, 0.15);
+      roadGain.gain.setTargetAtTime(Math.pow(Math.min(speed / 5.6, 1), 1.5) * 0.07, t, 0.15);
       if (profile.turbo) {
         turboOsc.frequency.setTargetAtTime(1800 + norm * 4200, t, 0.1);
         turboGain.gain.setTargetAtTime(0.012 * load * norm * norm, t, 0.12);
@@ -652,8 +652,8 @@ export function createAudio(initiallyOn = true) {
           if (sample(Math.random() < 0.5 ? 'bumpHeavy' : 'bumpLight', 0.7, jitter(1, 0.1))) return;
           return blip('triangle', 120, 50, 0.08, 0.2);
         case 'good': // door thunk when a car is parked or handed back
-          blip('sine', 640, 920, 0.045, 0.18);
-          return sample('door', 0.35, jitter(1.1, 0.05));
+          blip('sine', 640, 920, 0.025, 0.18);
+          return sample('door', 0.12, jitter(1.1, 0.05));
         case 'vip': return blip('sine', 760, 1180, 0.05, 0.28);
         case 'chain': { // combo level-up: pitch climbs with the multiplier
           const f = 520 * Math.pow(1.0595, Math.min(n, 8) * 2);
@@ -666,7 +666,7 @@ export function createAudio(initiallyOn = true) {
         case 'tick': return blip('square', 900, 900, 0.02, 0.05);
         case 'perfect': { // quick rising arpeggio; each perfect in a row climbs two semitones
           const k = Math.pow(1.0595, (Math.min(Math.max(n, 1), 8) - 1) * 2);
-          sample('door', 0.3, 1.15);
+          sample('door', 0.1, 1.15);
           blip('sine', 880 * k, 880 * k, 0.05, 0.14, 0);
           blip('sine', 1175 * k, 1175 * k, 0.05, 0.14, 0.09);
           return blip('sine', 1568 * k, 1568 * k, 0.055, 0.3, 0.18);

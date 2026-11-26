@@ -143,6 +143,7 @@ export function confetti(x, z) {
 
 export function addFx() {
   G.coachEl = document.createElement('div');
+  G.coachEl.className = 'coach-banner';
   G.coachEl.style.cssText = 'position:fixed;left:50%;top:230px;transform:translateX(-50%);z-index:3;pointer-events:none;max-width:min(420px,86vw);text-align:center;padding:12px 20px;background:#0a1822;border:2px solid #ffc247;border-radius:16px;color:#fff7e6;font:700 15px/1.4 Nunito,system-ui,sans-serif;opacity:0;transition:opacity .3s';
   document.body.appendChild(G.coachEl);
   G.flashEl = document.createElement('div');

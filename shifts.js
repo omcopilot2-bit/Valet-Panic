@@ -1,5 +1,6 @@
 // Duel mode (the Shifts campaign): you are the valet on foot. Arrivals, parking, guest calls, hand-offs, combo and the closing-time ending. The HUD lives in hud.js, the results card in results.js, the rival in rival.js.
 import * as THREE from 'three';
+import { buildPlan, stepDrive } from './autodrive.js';
 import { CAR_BODY_OFFSETS, CAR_BODY_RADIUS, carPathBlocked, carPathHitsCircle, circleVsCollider, circleVsParkingBox, separationNormal } from './collision.js';
 import { disposeCar, makeRandomCar, placeCar, resetLot, seedCars, updateTags } from './cars.js';
 import { parkCar } from './classic.js';
@@ -502,7 +503,8 @@ function enterCar(car) {
 }
 
 // The guest's car pulls up to the drop-off on its own; the guest steps out and heads into the lobby.
-function stepArrive(c, dt) {
+// Cone Alley: arrivals follow a fixed route at a fixed pace (unchanged). Returns true once the car has stopped at the drop-off.
+function stepArrivalRoute(c, dt) {
   let nextX, nextZ, nextYaw = c.yaw, arrived;
   if (c.arrivalRoute && c.arrivalRoute.length) {
     let i = c.arrivalRouteIndex || 0;
@@ -535,7 +537,7 @@ function stepArrive(c, dt) {
     || carPathHitsCircle(c, nextX, nextZ, nextYaw, [...G.colliders, ...peopleWithRightOfWay], 0.02)) {
     c.speed = c.vx = c.vz = 0;                 // arrivals wait for active valet traffic to clear (but not forever)
     c.blockT = (c.blockT || 0) + dt;
-    if (c.blockT < 2.5) return;
+    if (c.blockT < 2.5) return false;
   } else c.blockT = 0;
   const oldX = c.x, oldZ = c.z;
   c.x = nextX; c.z = nextZ; c.yaw = nextYaw;
@@ -544,6 +546,29 @@ function stepArrive(c, dt) {
   c.speed = Math.hypot(c.vx, c.vz);
   c.root.position.set(c.x, 0.045, c.z);
   c.root.rotation.y = c.yaw;
+  return arrived;
+}
+
+// Every other venue: the guest rolls in from the left already moving, then eases to a stop on the drop-off ring, like a person
+// pulling up. Returns true once the car has stopped there.
+function stepArrivalRoll(c, dt) {
+  if (!c.arrivalPlan) c.arrivalPlan = buildPlan(c, [{ x: DROPOFF.x, z: c.z }], { v0: 4.5 });
+  const movers = [...cars].filter((o) => o !== c && !o.parked);
+  const people = otherPeople(null).filter((p) => p.fig?.role === 'valet' || p.fig?.role === 'rival');
+  const blocked = (x, z, yaw) => carPathBlocked(c, x, z, yaw, movers, 0.08);
+  const nearPerson = (x, z, yaw) => carPathHitsCircle(c, x, z, yaw, people, 0.02);
+  c.arrivalGhostT = Math.max(0, (c.arrivalGhostT || 0) - dt);
+  const state = stepDrive(c, c.arrivalPlan, dt, { maxSpeed: 5, blocked: c.arrivalGhostT > 0 ? null : blocked, slow: nearPerson, fx: !reduceMotion });
+  if (state === 'blocked' && c.arrivalPlan.waitT > 1.5) c.arrivalGhostT = 1.0;   // arrivals wait for another car, but not for long
+  c.root.position.set(c.x, 0.045, c.z);
+  c.root.rotation.y = c.yaw;
+  if (state !== 'done') return false;
+  c.arrivalPlan = null;
+  return true;
+}
+
+function stepArrive(c, dt) {
+  const arrived = c.arrivalRoute && c.arrivalRoute.length ? stepArrivalRoute(c, dt) : stepArrivalRoll(c, dt);
   if (!arrived) return;
   c.arriving = false;
   c.arrivalRoute = null;

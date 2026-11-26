@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import { angleDifference, BOUNDS, CONE_ALLEY_ROAD, duelGoals, duelStars, DROPOFF, HANDOFF, HANDOFF_ANGLE, HANDOFF_YAW, LEVELS, PARKED_HALF, PARKING_LAYOUTS, PARKING_TYPES, PARK_ANGLE, SLOT_LAYOUTS, SLOT_POSITIONS } from './config.js';
 import { ENGINE_PROFILES, engineRpm, gearForSpeed } from './audio.js';
+import { buildPlan, clearanceFn, routeAround, stepDrive } from './autodrive.js';
 import { approachPoint, coneAlleyArrivalRoute, coneAlleyExitRoute, deliverRoute, footRoute, parkRoute } from './routes.js';
 import { keyName } from './keymap.js';
 import { addXp, isLevelUnlocked, levelInfo, loadFromPlatform, recordLevel, save, xpToNext } from './progress.js';
@@ -227,6 +228,110 @@ test('bonus XP from a rewarded ad adds the run XP a second time', () => {
   const bonus = addXp(first.gained);
   assert.equal(save.xp, p0 + 240);
   assert.equal(bonus.gained, 120);
+});
+
+/* ---------- the AI driver (autodrive.js): whole drives, simulated frame by frame ---------- */
+// The default lot: props plus a parked car in every bay except the one the car is working with.
+const lotProps = () => {
+  const o = [];
+  for (const z of [-2.3, 4.2]) for (const x of [-13.55, 13.55]) o.push({ x, z, r: 1.15, halfX: 0.8, halfZ: 0.8 });
+  for (let z = -7; z <= -3.8; z += 1.6) for (const x of [-12.3, 12.3]) o.push({ x, z, r: 0.26 });
+  return o;
+};
+// How far the car's two body circles (r 0.7) sink into parked cars or props at this moment.
+function overlap(c, others, props) {
+  let worst = 0;
+  for (const off of [-0.7, 0.7]) {
+    const px = c.x + Math.sin(c.yaw) * off, pz = c.z + Math.cos(c.yaw) * off;
+    for (const [x, z] of others) {
+      const qx = Math.max(x - PARKED_HALF.x, Math.min(px, x + PARKED_HALF.x)), qz = Math.max(z - PARKED_HALF.z, Math.min(pz, z + PARKED_HALF.z));
+      worst = Math.max(worst, 0.7 - Math.hypot(px - qx, pz - qz));
+    }
+    for (const o of props) {
+      const qx = Math.max(o.x - (o.halfX ?? 0), Math.min(px, o.x + (o.halfX ?? 0))), qz = Math.max(o.z - (o.halfZ ?? 0), Math.min(pz, o.z + (o.halfZ ?? 0)));
+      worst = Math.max(worst, 0.7 + (o.halfX === undefined ? o.r : 0) - Math.hypot(px - qx, pz - qz));
+    }
+  }
+  return worst;
+}
+function simulate(start, route, skip, options = {}) {
+  const props = lotProps(), others = SLOT_POSITIONS.filter((_, i) => i !== skip);
+  const obstacles = [...props, ...others.map(([x, z]) => ({ x, z, r: 1.0, ...(options.box ? { halfX: PARKED_HALF.x, halfZ: PARKED_HALF.z } : {}) }))];
+  const car = { x: start.x, z: start.z, yaw: start.yaw, vx: 0, vz: 0, speed: 0 };
+  const plan = buildPlan(car, routeAround(car, route, obstacles), { clear: clearanceFn(obstacles), flow: options.flow });
+  let t = 0, worst = 0, state = 'driving';
+  while (t < 40 && state !== 'done') { state = stepDrive(car, plan, 1 / 60, { maxSpeed: 4.4 }); t += 1 / 60; worst = Math.max(worst, overlap(car, others, props)); }
+  return { car, done: state === 'done', t, worst };
+}
+const P = Math.PI;
+
+test('the AI finishes every drive into a bay, nose-in and reversing in, without touching a parked car', () => {
+  SLOT_POSITIONS.forEach(([x, z], i) => {
+    for (const yaw of [P, 0]) {
+      const route = parkRoute({ x, z }, yaw), end = route[route.length - 1];
+      const r = simulate({ x: DROPOFF.x, z: DROPOFF.z, yaw: P / 2 }, route, i);
+      assert.ok(r.done, `bay ${i + 1} (yaw ${yaw}) finishes`);
+      assert.ok(Math.hypot(r.car.x - end.x, r.car.z - end.z) < 0.3, `bay ${i + 1} (yaw ${yaw}) stops in the bay`);
+      assert.ok(Math.abs(angleDifference(r.car.yaw, yaw)) < 0.45, `bay ${i + 1} (yaw ${yaw}) ends lined up with the bay`);
+      assert.ok(r.worst < 0.05, `bay ${i + 1} (yaw ${yaw}) clips something by ${r.worst.toFixed(2)}`);
+    }
+  });
+});
+
+test('the AI backs out of a bay and rolls into the pick-up ring facing the right way', () => {
+  SLOT_POSITIONS.forEach(([x, z], i) => {
+    for (const yaw of [P, 0]) {
+      const r = simulate({ x, z, yaw }, deliverRoute({ x, z }, yaw), i);
+      assert.ok(r.done, `bay ${i + 1} (yaw ${yaw}) finishes`);
+      assert.ok(Math.hypot(r.car.x - HANDOFF.x, r.car.z - HANDOFF.z) < 0.3, `bay ${i + 1} (yaw ${yaw}) stops in the ring`);
+      assert.ok(r.worst < 0.05, `bay ${i + 1} (yaw ${yaw}) clips something by ${r.worst.toFixed(2)}`);
+    }
+  });
+});
+
+test('a car arriving from the left stops on the drop-off ring; the AI never runs off the end of its route', () => {
+  const r = simulate({ x: -16.3, z: DROPOFF.z, yaw: P / 2 }, [{ x: DROPOFF.x, z: DROPOFF.z }], -1);
+  assert.ok(r.done && Math.hypot(r.car.x - DROPOFF.x, r.car.z - DROPOFF.z) < 0.3);
+  const stray = simulate({ x: 0, z: 5, yaw: P / 2 }, [{ x: 4, z: 5 }, { x: 4, z: 8 }], -1);   // a path that ends away from where the nose points
+  assert.ok(stray.done, 'it still ends the route');
+});
+
+test('cars leaving the lot go round props (the back lane runs into a planter) and drive off the right edge', () => {
+  SLOT_POSITIONS.forEach(([x, z], i) => {
+    const lane = z < 0 ? -1.72 : 7.6, zr = Math.min(lane, z + 4.4);
+    const nodes = [{ x, z: zr, rev: true }, { x: x - Math.max(0.9, Math.min(2.2, x + 11)), z: zr, rev: true }];
+    if (zr < lane - 0.3) nodes.push({ x: x + 3, z: lane });
+    nodes.push({ x: 17, z: lane });
+    const r = simulate({ x, z, yaw: P }, nodes, i, { flow: true, box: true });
+    assert.ok(r.done && r.car.x > 14, `bay ${i + 1} leaves`);
+    assert.ok(r.worst < 0.05, `bay ${i + 1} clips something by ${r.worst.toFixed(2)}`);
+  });
+});
+
+test('the AI brakes for something in its way and never drives through it', () => {
+  const car = { x: 0, z: 5, yaw: P / 2, vx: 0, vz: 0, speed: 0 };
+  const plan = buildPlan(car, [{ x: 12, z: 5 }], {});
+  let stoppedAt = null;
+  for (let t = 0; t < 600; t++) {
+    const state = stepDrive(car, plan, 1 / 60, { maxSpeed: 4.4, blocked: (x) => x > 6 });   // a wall at x = 6
+    if (state === 'blocked' && plan.v < 0.01) { stoppedAt = car.x; break; }
+  }
+  assert.ok(stoppedAt !== null && stoppedAt < 6, 'it stops short of the wall');
+});
+
+test('the AI crawls past a person standing in its way instead of getting stuck, but still waits for another car', () => {
+  const run = (options) => {
+    const car = { x: 0, z: 5, yaw: P / 2, vx: 0, vz: 0, speed: 0 };
+    const plan = buildPlan(car, [{ x: 12, z: 5 }], {});
+    let state = 'driving', t = 0, slowest = Infinity;
+    while (state !== 'done' && t < 20) { state = stepDrive(car, plan, 1 / 60, { maxSpeed: 4.4, ...options }); t += 1 / 60; if (car.x > 5.5 && car.x < 8) slowest = Math.min(slowest, plan.v); }
+    return { done: state === 'done', t, slowest };
+  };
+  const crowd = run({ slow: (x) => x > 5 && x < 8 });             // a valet standing beside the aisle
+  assert.ok(crowd.done, 'it gets through');
+  assert.ok(crowd.slowest > 0.3, 'and never stops dead for a person');
+  const wall = run({ blocked: (x) => x > 8 });                    // another car parked across the lane
+  assert.ok(!wall.done, 'a car in the way still stops it');
 });
 
 console.log(`\n${n} checks passed`);
