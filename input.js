@@ -15,6 +15,18 @@ let peekTimerId = 0, peekArmed = null, peekFired = false;
 let walkPointer = null, steerPointer = null, steerStartValue = 0, steerLastAngle = null, steerAccumulatedAngle = 0;
 const mobileControlsElement = $('#mobileControls');
 
+/* ---------- steering style: the wheel (default) or left / right buttons, chosen in the pause menu ---------- */
+const STEER_KEY = 'valetSteer';
+let steerMode = (() => { try { return localStorage.getItem(STEER_KEY) === 'buttons' ? 'buttons' : 'wheel'; } catch (e) { return 'wheel'; } })();
+const steerHeld = { left: false, right: false };
+export const getSteerMode = () => steerMode;
+export function setSteerMode(mode) {
+  steerMode = mode === 'buttons' ? 'buttons' : 'wheel';
+  document.body.dataset.steer = steerMode;
+  try { localStorage.setItem(STEER_KEY, steerMode); } catch (e) { /* storage unavailable */ }
+  resetSteering();
+}
+
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 
 function resetWalk() {
@@ -31,6 +43,9 @@ function resetSteering() {
   touchInput.steerTarget = 0;
   steerLastAngle = null;
   steerAccumulatedAngle = 0;
+  steerHeld.left = false;
+  steerHeld.right = false;
+  document.querySelectorAll('.steer-btn.is-held').forEach((b) => b.classList.remove('is-held'));
   const wheel = $('#steeringWheel');
   if (wheel) wheel.style.transform = 'rotate(0deg)';
   const control = $('#steerControl');
@@ -274,8 +289,36 @@ export function addControls() {
   bindPedal($('#gasBtn'), 'gas');
   bindPedal($('#brakeBtn'), 'brake');
   bindPedal($('#reverseBtn'), 'reverse');
-  $('#parkBtn').addEventListener('pointerdown', (e) => { e.preventDefault(); parkCar(); });
-  $('#honkBtn').addEventListener('pointerdown', (e) => { e.preventDefault(); honk(); });
+
+  // Button steering: hold ◀ / ▶ (both at once cancel out). drive() eases the car into the turn, just like the wheel.
+  document.body.dataset.steer = steerMode;
+  const bindSteerButton = (selector, side) => {
+    const btn = $(selector);
+    if (!btn) return;
+    let pointerId = null;
+    const apply = () => { touchInput.steerTarget = (steerHeld.left ? 1 : 0) - (steerHeld.right ? 1 : 0); };
+    btn.addEventListener('pointerdown', (e) => {
+      if (mobileControls.dataset.state !== 'driving') return;
+      e.preventDefault();
+      pointerId = e.pointerId;
+      btn.setPointerCapture(e.pointerId);
+      steerHeld[side] = true;
+      btn.classList.add('is-held');
+      apply();
+    });
+    const release = (e) => {
+      if (pointerId !== null && e.pointerId !== pointerId) return;
+      pointerId = null;
+      steerHeld[side] = false;
+      btn.classList.remove('is-held');
+      apply();
+    };
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach((ev) => btn.addEventListener(ev, release));
+  };
+  bindSteerButton('#steerLeftBtn', 'left');
+  bindSteerButton('#steerRightBtn', 'right');
+  bindSteerButton('#parkBtn', 'park');
+  bindSteerButton('#honkBtn', 'honk');
 
   bindTitle();
 

@@ -16,6 +16,19 @@ const SAMPLE_FILES = {
   coins: 'coins.ogg',
 };
 
+// Volume of each kind of sound (1 = as it was). The limiter in ensure() keeps the louder mix from clipping.
+const VOL = {
+  door: 0.25,       // the door thunk on parks and hand-offs: was far too loud
+  horn: 1.6,
+  bumpHeavy: 1.4,
+  bumpLight: 1.4,
+  coins: 1.5,
+  blip: 2.5,        // every synth beep: combo, perfect, power-up, VIP, tick, beep-beep horn...
+  music: 0.45,      // background music (was 0.22)
+  engine: 1.6,      // engine, turbo whistle and blow-off
+  road: 2.0,        // tyre / road noise
+};
+
 // cyl/idle/redline/firing/amps: engine layout. jitter/ampJitter: cycle-to-cycle irregularity.
 // pulseMs/noise/noiseMs/tick: combustion thump, hiss/rasp and valve/injector clatter.
 // res: exhaust resonances [freqHz, ringing 0..1, gain]. lp: muffler cutoff. drive: saturation.
@@ -282,7 +295,14 @@ export function createAudio(initiallyOn = true) {
       ctx = new AC();
       master = ctx.createGain();
       master.gain.value = on ? 1 : 0;
-      master.connect(ctx.destination);
+      // A gentle limiter: everything can play louder without crackling when several sounds overlap.
+      const limiter = ctx.createDynamicsCompressor();
+      limiter.threshold.value = -6;
+      limiter.knee.value = 6;
+      limiter.ratio.value = 12;
+      limiter.attack.value = 0.003;
+      limiter.release.value = 0.15;
+      master.connect(limiter).connect(ctx.destination);
 
       // engine chain: voice -> filter -> level -> shift cut -> master
       engineFilter = ctx.createBiquadFilter();
@@ -336,7 +356,7 @@ export function createAudio(initiallyOn = true) {
     osc.type = type;
     osc.frequency.setValueAtTime(f0, t);
     if (f1 !== f0) osc.frequency.exponentialRampToValueAtTime(f1, t + Math.min(dur, 0.15));
-    g.gain.setValueAtTime(gain, t);
+    g.gain.setValueAtTime(gain * VOL.blip, t);
     g.gain.exponentialRampToValueAtTime(0.001, t + dur);
     osc.connect(g).connect(master);
     osc.start(t);
@@ -351,7 +371,7 @@ export function createAudio(initiallyOn = true) {
     const g = ctx.createGain();
     src.buffer = buf;
     src.playbackRate.value = rate;
-    g.gain.value = gain;
+    g.gain.value = gain * (VOL[key] ?? 1);
     src.connect(g).connect(master);
     src.start(ctx.currentTime + delay);
     return true;
@@ -374,7 +394,7 @@ export function createAudio(initiallyOn = true) {
     f.frequency.exponentialRampToValueAtTime(2200, t + 0.35);
     f.Q.value = 0.8;
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.linearRampToValueAtTime(0.09, t + 0.02);
+    g.gain.linearRampToValueAtTime(0.09 * VOL.engine, t + 0.02);
     g.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
     src.connect(f).connect(g).connect(master);
     src.start(t);
@@ -481,7 +501,7 @@ export function createAudio(initiallyOn = true) {
         M.bus.connect(master);
       }
       M.bus.gain.cancelScheduledValues(ctx.currentTime);
-      M.bus.gain.setTargetAtTime(0.16, ctx.currentTime, 0.3);
+      M.bus.gain.setTargetAtTime(VOL.music, ctx.currentTime, 0.3);
       if (M.running) return;
       M.running = true;
       M.step = 0;
@@ -563,12 +583,12 @@ export function createAudio(initiallyOn = true) {
       });
 
       const norm = Math.max(0, Math.min(1, (rpm - profile.idle) / (profile.redline - profile.idle)));
-      engineGain.gain.setTargetAtTime((0.2 + norm * 0.2) * (0.6 + 0.4 * load), t, 0.08);
+      engineGain.gain.setTargetAtTime((0.28 + norm * 0.2) * (0.7 + 0.3 * load) * VOL.engine, t, 0.08);
       engineFilter.frequency.setTargetAtTime((profile.cutoff + speed * profile.rise) * 2 * (0.55 + 0.45 * load), t, 0.12);
-      roadGain.gain.setTargetAtTime(Math.pow(Math.min(speed / 5.6, 1), 1.5) * 0.05, t, 0.15);
+      roadGain.gain.setTargetAtTime(Math.pow(Math.min(speed / 5.6, 1), 1.5) * 0.07 * VOL.road, t, 0.15);
       if (profile.turbo) {
         turboOsc.frequency.setTargetAtTime(1800 + norm * 4200, t, 0.1);
-        turboGain.gain.setTargetAtTime(0.012 * load * norm * norm, t, 0.12);
+        turboGain.gain.setTargetAtTime(0.012 * load * norm * norm * VOL.engine, t, 0.12);
       } else {
         turboGain.gain.setTargetAtTime(0, t, 0.05);
       }

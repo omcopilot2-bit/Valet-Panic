@@ -502,6 +502,14 @@ body[data-touch="true"][data-mode="rush"] .pickup-banner .plate{margin-top:3px;f
   .overlay:not(.title) .res{display:grid;grid-template-columns:1fr 1.15fr;gap:16px;align-items:center}
   .overlay:not(.title) .res-side{min-width:0}
 }
+/* Button steering (chosen in the pause menu): two hold-to-steer buttons in place of the wheel, same footprint */
+.steer-buttons{display:none;width:100%;height:120px;gap:8px;touch-action:none}
+.steer-btn{flex:1;min-width:0;display:grid;place-items:center;border:2px solid #ffffff55;border-radius:20px;background:#0a1822e8;color:var(--cream);box-shadow:0 4px 10px #0006;font:800 30px/1 'Fredoka','Trebuchet MS',system-ui,sans-serif;pointer-events:auto;touch-action:none;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+.steer-btn.is-held{background:var(--sky-d);border-color:var(--sky);filter:brightness(1.15)}
+body[data-steer="buttons"] .steer-control{display:none}
+body[data-steer="buttons"] .steer-buttons{display:flex}
+@media(max-width:360px){.steer-buttons{height:100px}}
+@media(max-width:420px) and (max-height:480px){.steer-buttons{height:90px}}
 </style>
 <script type="importmap">{"imports":{"three":"./assets/three/three.module.js"}}</script>
 </head><body class="menu">
@@ -522,7 +530,7 @@ body[data-touch="true"][data-mode="rush"] .pickup-banner .plate{margin-top:3px;f
 <footer class="bottom"><div class="instruction"><span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span><span class="instruction-text">Drive</span><span class="key space">SPACE</span><span class="instruction-text">Park</span><span class="key">CLICK</span><span class="instruction-text">Return keys</span></div></footer>
 <div class="mobile-controls" id="mobileControls" data-state="hidden" aria-label="Touch controls">
  <div class="left-control move-control" id="walkControl"><span class="control-label">MOVE</span><div class="joystick-base" id="walkStick" role="application" aria-label="Movement joystick"><span class="joystick-knob" id="walkKnob"></span></div></div>
- <div class="left-control steering-group"><span class="control-label">STEER</span><div class="steer-control" id="steerControl" role="slider" aria-label="Steering" aria-valuemin="-100" aria-valuemax="100" aria-valuenow="0" tabindex="0"><span class="steering-wheel" id="steeringWheel"><span class="wheel-marker"></span><span class="steering-hub"></span></span></div></div>
+ <div class="left-control steering-group"><span class="control-label">STEER</span><div class="steer-control" id="steerControl" role="slider" aria-label="Steering" aria-valuemin="-100" aria-valuemax="100" aria-valuenow="0" tabindex="0"><span class="steering-wheel" id="steeringWheel"><span class="wheel-marker"></span><span class="steering-hub"></span></span></div><div class="steer-buttons" id="steerButtons"><button class="steer-btn" id="steerLeftBtn" aria-label="Steer left">◀</button><button class="steer-btn" id="steerRightBtn" aria-label="Steer right">▶</button></div></div>
  <div class="pad-right">
   <button class="mobile-honk" id="honkBtn" aria-label="Honk" title="Honk"><img src="./assets/ui/bullhorn.svg" alt=""></button>
   <button class="mobile-park" id="parkBtn">ACTION</button>

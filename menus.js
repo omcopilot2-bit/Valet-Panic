@@ -3,7 +3,7 @@ import { resetLot, seedCars } from './cars.js';
 import { start } from './classic.js';
 import { BAY_THEMES, CONFETTI, HATS, HORNS, levelMods, LEVELS, OUTFITS, PAINTS } from './config.js';
 import { $, applyModeHud, audio, modelCache, TITLE_HTML, toast, ui } from './core.js';
-import { cancelPeek } from './input.js';
+import { cancelPeek, getSteerMode, setSteerMode } from './input.js';
 import * as platform from './platform.js';
 import { equip, equippedItem, isLevelUnlocked, isUnlocked, levelBest, levelInfo, levelStars, runLogSummary, save, totalStars } from './progress.js';
 import { applyLevelLayout } from './shifts-world.js';
@@ -132,9 +132,13 @@ export function showTitle() {
 function buildPause() {
   G.pauseOverlay = document.createElement('div');
   G.pauseOverlay.className = 'overlay hide';
-  G.pauseOverlay.innerHTML = `<div class="hero"><div class="hero-eyebrow">NOCTURNE HOTEL · ON BREAK</div><h1>Shift <em>paused.</em></h1><p>The guests can wait a moment. Your clock is stopped.</p><button class="play" id="resume">Resume</button><button class="play ghost" id="skipTut" style="display:none">Skip tutorial</button><button class="play ghost" id="pauseSceneLab" style="display:none">Choose another scene</button><button class="play ghost" id="pauseMenu">Main menu</button><div class="hero-foot">P OR THE PAUSE BUTTON TO RESUME</div></div>`;
+  G.pauseOverlay.innerHTML = `<div class="hero"><div class="hero-eyebrow">NOCTURNE HOTEL · ON BREAK</div><h1>Shift <em>paused.</em></h1><p>The guests can wait a moment. Your clock is stopped.</p><button class="play" id="resume">Resume</button><button class="play ghost" id="steerToggle" style="display:none" aria-pressed="false">Steering: Wheel</button><button class="play ghost" id="skipTut" style="display:none">Skip tutorial</button><button class="play ghost" id="pauseSceneLab" style="display:none">Choose another scene</button><button class="play ghost" id="pauseMenu">Main menu</button><div class="hero-foot">P OR THE PAUSE BUTTON TO RESUME</div></div>`;
   document.body.appendChild(G.pauseOverlay);
   G.pauseOverlay.querySelector('#resume').addEventListener('click', () => setPaused(false));
+  G.pauseOverlay.querySelector('#steerToggle').addEventListener('click', () => {
+    setSteerMode(getSteerMode() === 'wheel' ? 'buttons' : 'wheel');
+    renderSteerToggle();
+  });
   G.pauseOverlay.querySelector('#pauseMenu').addEventListener('click', () => {
     G.pauseOverlay.classList.add('hide');
     G.paused = false;
@@ -157,6 +161,16 @@ function buildPause() {
   });
 }
 
+// The steering choice only matters on touch screens, so the toggle only shows there.
+function renderSteerToggle() {
+  const b = G.pauseOverlay && G.pauseOverlay.querySelector('#steerToggle');
+  if (!b) return;
+  const buttons = getSteerMode() === 'buttons';
+  b.style.display = '';   // always show; to restore touch-only: touch ? '' : 'none'
+  b.textContent = buttons ? 'Steering: ◀ ▶ Buttons' : 'Steering: Wheel';
+  b.setAttribute('aria-pressed', String(buttons));
+}
+
 export function setPaused(p) {
   if (!G.running || p === G.paused || rush.picking) return;   // the perk picker owns the pause while it is open
   G.paused = p;
@@ -166,6 +180,7 @@ export function setPaused(p) {
   if (!G.pauseOverlay) buildPause();
   G.pauseOverlay.classList.toggle('hide', !p);
   G.pauseOverlay.querySelector('#skipTut').style.display = tutorial.on ? '' : 'none';
+  renderSteerToggle();
   G.pauseOverlay.querySelector('#pauseSceneLab').style.display = rush.sceneLab ? '' : 'none';
   audio.pause(p);
 }

@@ -2,8 +2,8 @@
 import * as THREE from 'three';
 import { preload, seedCars } from './cars.js';
 import { parkCar, start, updateClassic, updateHUD } from './classic.js';
-import { LEVELS, reduceMotion } from './config.js';
-import { addFx, audio, camera, canvas, clock, markAllSlots, renderer, scene, toast } from './core.js';
+import { HANDOFF, LEVELS, reduceMotion } from './config.js';
+import { addFx, audio, camera, canvas, clock, markAllSlots, parkRadius, renderer, scene, toast, worldToScreen } from './core.js';
 import { animateCars, updateFx } from './fx.js';
 import { addControls, renderSoundButton, updateMobileControls } from './input.js';
 import { addPauseUI, applyCosmetics, setTitleButtons, showLevelSelect, showSceneLab, showTitle, updateBestLine } from './menus.js';
@@ -42,6 +42,56 @@ function enableTitleWhenReady() {
 if (!platformExpected) {
   loadSave();
   applyLoadedSave();
+}
+
+/* ---------- touch screens: lift the view clear of the on-screen controls ---------- */
+// When the car you drive, the bay or PICK-UP ring it is heading for, or the valet on foot would sit under the pedals,
+// the steering wheel or the joystick, the camera pans so it rises above them. The controls keep their full size,
+// and the view eases back once nothing important is underneath.
+const mobileControlsEl = document.getElementById('mobileControls');
+const CAM_ELEVATION_SIN = 25 / Math.hypot(25, 20.7);   // how much screen height one unit of lot depth takes (camera ~50° up)
+let liftPx = 0;
+
+function controlRects() {
+  if (!mobileControlsEl || mobileControlsEl.dataset.state === 'hidden' || !mobileControlsEl.offsetWidth) return [];
+  return [...mobileControlsEl.querySelectorAll('.left-control, .drive-pedals, .mobile-park, .mobile-honk')]
+    .filter((el) => el.offsetWidth > 0)
+    .map((el) => el.getBoundingClientRect());
+}
+
+// What must stay visible: [x, z, radius] in lot units.
+function liftTargets() {
+  const pts = [];
+  const car = G.activeCar;
+  if (car) {
+    pts.push([car.x, car.z, 1.5]);
+    if (car.delivering) pts.push([HANDOFF.x, HANDOFF.z, parkRadius()]);
+    else if (car.slot && !car.parked) pts.push([car.slot.x, car.slot.z, parkRadius()]);
+  } else if (G.mode === 'rush' && rush.pl && rush.pl.mode === 'foot') pts.push([rush.pl.x, rush.pl.z, 0.8]);
+  return pts;
+}
+
+// Returns how far (in lot units) to pan the camera towards the front of the lot this frame.
+function updateLift(dt) {
+  const H = canvas.clientHeight || innerHeight;
+  const pxPerUnit = H / ((camera.top - camera.bottom) / camera.zoom);
+  let target = 0;
+  const rects = G.running && !G.paused ? controlRects() : [];
+  if (rects.length) {
+    for (const [x, z, r] of liftTargets()) {
+      const s = worldToScreen(x, z, 0);
+      const y0 = s.y + liftPx;                                   // where it would be on screen with no lift
+      const rx = r * pxPerUnit, ry = r * pxPerUnit * CAM_ELEVATION_SIN;
+      for (const b of rects) {
+        if (s.x + rx < b.left - 10 || s.x - rx > b.right + 10) continue;   // not above this control
+        target = Math.max(target, y0 + ry - (b.top - 14));
+      }
+    }
+    target = Math.min(Math.max(0, target), H * 0.24);            // never pan more than about a quarter of the screen
+  }
+  liftPx += (target - liftPx) * (1 - Math.exp(-dt * 4));         // smooth, no jolts
+  if (target === 0 && liftPx < 0.5) liftPx = 0;
+  return liftPx / pxPerUnit / CAM_ELEVATION_SIN;
 }
 
 function update(dt) {
@@ -84,11 +134,13 @@ function update(dt) {
     G.shake = Math.max(0, G.shake - dt * 1.6);
   }
   if (portrait) {
+    liftPx = 0;
     camera.position.set(cameraFocus.x + cameraShake, 25, cameraFocus.z + 20.7);
     camera.lookAt(cameraFocus.x, 0, cameraFocus.z);
   } else {
-    camera.position.set(cameraShake, 25, 19);
-    camera.lookAt(0, 0, -1.7);
+    const liftZ = updateLift(dt);   // 0 unless something important would sit under the touch controls
+    camera.position.set(cameraShake, 25, 19 + liftZ);
+    camera.lookAt(0, 0, -1.7 + liftZ);
   }
   camera.updateMatrixWorld(true);
   if (G.wrongFlash > 0) G.wrongFlash = Math.max(0, G.wrongFlash - dt * 2.5);
