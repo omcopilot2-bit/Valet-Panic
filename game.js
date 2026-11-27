@@ -6,7 +6,7 @@ import { HANDOFF, LEVELS, reduceMotion } from './config.js';
 import { addFx, audio, camera, canvas, clock, markAllSlots, parkRadius, renderer, scene, toast, worldToScreen } from './core.js';
 import { animateCars, updateFx } from './fx.js';
 import { addControls, renderSoundButton, updateMobileControls } from './input.js';
-import { addPauseUI, applyCosmetics, setTitleButtons, showLevelSelect, showSceneLab, showTitle, updateBestLine } from './menus.js';
+import { addPauseUI, applyCosmetics, setTitleButtons, setTitleLoadError, showLevelSelect, showSceneLab, showTitle, updateBestLine } from './menus.js';
 import { updateFigures } from './people.js';
 import * as platform from './platform.js';
 import { load as loadSave, loadFromPlatform, save } from './progress.js';
@@ -372,7 +372,8 @@ preload()
   .catch((err) => {
     platform.loadingComplete();
     console.error('Could not load bundled car models', err);
-    toast('One of the bundled cars failed to load.');
+    setTitleLoadError('Cars unavailable');
+    toast('Car models failed to load. Check the game files and reload.');
   });
 
 requestAnimationFrame(render);

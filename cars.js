@@ -43,9 +43,22 @@ export async function preload() {
   // Make sure the UI font is ready before it is baked into tag textures.
   const fontReady = document.fonts ? document.fonts.load('700 40px Fredoka').catch(() => {}) : Promise.resolve();
   const models = MODEL_FILES.map((f) => new Promise((resolve, reject) => {
-    loader.load(`./assets/vehicles/${f}`, (g) => { modelCache.set(f, normalizeModel(g.scene)); resolve(); }, undefined, reject);
+    loader.load(`./assets/vehicles/${f}`, (g) => {
+      try { modelCache.set(f, normalizeModel(g.scene)); resolve(); }
+      catch (error) { reject(error); }
+    }, undefined, reject);
   }));
-  await Promise.all([fontReady, ...models]);
+  const results = await Promise.allSettled([fontReady, ...models]);
+  const fallback = modelCache.values().next().value;
+  if (!fallback) {
+    const failed = results.find((result) => result.status === 'rejected');
+    throw failed ? failed.reason : new Error('No vehicle models could be loaded');
+  }
+  for (const file of MODEL_FILES) {
+    if (modelCache.has(file)) continue;
+    console.warn(`Could not load ${file}; using another bundled car model instead.`);
+    modelCache.set(file, fallback);
+  }
 }
 
 function tintCar(root, color) {

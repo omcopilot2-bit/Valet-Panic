@@ -381,6 +381,14 @@ export function updateFigures(dt) {
           [f.root.position.x + (fx * 0.45 + sx * 0.9) * step, f.root.position.z + (fz * 0.45 + sz * 0.9) * step, false],
           [f.root.position.x + (fx * 0.45 - sx * 0.9) * step, f.root.position.z + (fz * 0.45 - sz * 0.9) * step, false],
         ];
+        // Blocked for a moment: try to go AROUND (sideways and diagonal) before anything else.
+        if ((f.stuckT || 0) > 0.25) {
+          const px = f.root.position.x, pz = f.root.position.z;
+          for (const a of [Math.PI / 2, -Math.PI / 2, Math.PI * 0.75, -Math.PI * 0.75]) {
+            const ca = Math.cos(a), sa = Math.sin(a);
+            choices.push([px + (fx * ca - fz * sa) * step, pz + (fx * sa + fz * ca) * step, false]);
+          }
+        }
         let best = null, bestD = Infinity;
         for (const [x, z, reachesWaypoint] of choices) {
           if (!clearWalkerStep(f, x, z)) continue;
@@ -390,7 +398,7 @@ export function updateFigures(dt) {
         // Boxed in for more than a moment (a valet, a car or a prop in the way): walk straight on instead of freezing forever.
         if (!best) {
           f.stuckT = (f.stuckT || 0) + dt;
-          if (f.stuckT > 0.6 && f.role !== 'valet') {
+          if (f.stuckT > 2.5 && f.role !== 'valet') {
             const [gx, gz] = choices[0];
             if (gx >= BOUNDS.minX && gx <= BOUNDS.maxX && gz >= (f.buildingRoute ? BUILDING_MIN_Z : BOUNDS.minZ) && gz <= BOUNDS.maxZ) best = choices[0];
           }
@@ -417,7 +425,9 @@ export function updateFigures(dt) {
       if (!(f.buildingRoute && pos.z < WALK_Z + 0.55) && pushFromObstacles(pos, f.r)) {
         f.blockT += dt;
       } else f.blockT = 0;
-      // Guests and staff give valets personal space; the moving pedestrian yields instead of dragging them.
+      // Robustness: a walker that is blocked or crawling for too long ignores obstacles so a guest can never get stuck.
+      f.walkT = f.path ? (f.walkT || 0) + dt : 0;
+      if (f.path && (f.blockT > 3.0 || f.walkT > 25)) { f.noCollide = true; f.blockT = 0; }
       if (!f.noCollide) pushFromPeople(pos, f.r, f, f.buildingRoute && !!f.path && (f.role === 'guest' || f.role === 'dog'));
       pos.x = THREE.MathUtils.clamp(pos.x, BOUNDS.minX + f.r, BOUNDS.maxX - f.r);
       pos.z = THREE.MathUtils.clamp(pos.z, (f.buildingRoute ? BUILDING_MIN_Z : BOUNDS.minZ) + f.r, BOUNDS.maxZ - f.r);

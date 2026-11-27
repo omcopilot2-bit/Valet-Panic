@@ -9,7 +9,7 @@ import { applyModeHud, audio, bubble, coach, confetti, formatTime, markAllSlots,
 import { angleToBay, drive, hornTick, stepExit, stepSnap } from './driving.js';
 import { ringBurst } from './fx.js';
 import { armResultsKeys, cancelPeek } from './input.js';
-import { enterBuilding, guide, otherPeople, poof, pushFromPeople, removeFigure, spawnFigure, walkTo } from './people.js';
+import { enterBuilding, guide, otherPeople, poof, pushFromObstacles, pushFromPeople, removeFigure, spawnFigure, walkTo } from './people.js';
 import * as platform from './platform.js';
 import { addXp, logRun, persist, recordLevel, save, submitScore } from './progress.js';
 import { applyLevelLayout, clearToken, closePerkPicker, collectToken, fireEvent, nearMiss, offerShiftIntro, spawnToken, tokenDelay, tokenTexture, updateLevelProps } from './shifts-world.js';
@@ -579,9 +579,12 @@ function stepArrive(c, dt) {
   c.waiting = true;
   c.waitLeft = keyWait();
   addMark(c, 'key', 0xffc247);
-  const g = spawnFigure('guest', DROPOFF.x + 0.3, DROPOFF.z - 1.3, 0);
+  const spawnSpot = [[0.3, -1.3], [0.3, 1.3], [-1.3, -1.1], [1.9, -1.1]]
+    .map(([dx, dz]) => ({ x: DROPOFF.x + dx, z: DROPOFF.z + dz }))
+    .find((p) => !pushFromObstacles({ x: p.x, z: p.z }, 0.35)) || { x: DROPOFF.x + 0.3, z: DROPOFF.z - 1.3 };
+  const g = spawnFigure('guest', spawnSpot.x, spawnSpot.z, 0);
   walkTo(g, dropPath(), 3.6, enterBuilding);
-  if (c.special) bubble(SPECIALS[c.special].line, DROPOFF.x + 0.3, DROPOFF.z - 1.3);
+  if (c.special) bubble(SPECIALS[c.special].line, spawnSpot.x, spawnSpot.z);
   audio.play('good');
   toast(`Guest dropped off${c.vip ? ' ⭐ VIP' : ''}${c.special ? ' ' + SPECIALS[c.special].icon + ' ' + SPECIALS[c.special].name : ''} → bay ${String(c.slot.id).padStart(2, '0')}. Run to the 🔑 car!`);
   updateRushHUD();

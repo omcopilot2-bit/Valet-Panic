@@ -1,7 +1,7 @@
 // Shifts support: venue layouts and hazards, power-up and bonus tokens, random events, honk and near-miss, the boon picker.
 import * as THREE from 'three';
 import { CAR_BODY_OFFSETS, CAR_BODY_RADIUS } from './collision.js';
-import { duelGoals, HORNS, levelMods, PARKING_LAYOUTS, PARKING_TYPES, POWERUPS, reduceMotion, RUSH_PERKS, SLOT_LAYOUTS, TOKEN_SPOTS } from './config.js';
+import { DROPOFF, duelGoals, HANDOFF, HORNS, levelMods, PARKING_LAYOUTS, PARKING_TYPES, POWERUPS, reduceMotion, RUSH_PERKS, SLOT_LAYOUTS, TOKEN_SPOTS } from './config.js';
 import { audio, parkRadius, popScore, scene, shuffle, toast, worldToScreen } from './core.js';
 import { cancelPeek } from './input.js';
 import { dropoff, guide, handoff, otherPeople } from './people.js';
@@ -281,6 +281,11 @@ function clearLevelProps() {
 export function applyLevelLayout(lv) {
   clearLevelProps();
   applyVenue(lv ? lv.id : 1);   // every shift is set in its own venue (null = the Nocturne Hotel)
+  // Opera moves both rings further down the lot, clear of the bays; every other venue keeps the default spots.
+  DROPOFF.z = lv && lv.id === 5 ? 7.0 : 5.9;
+  HANDOFF.z = lv && lv.id === 5 ? 6.6 : 5.4;
+  dropoff.group.position.set(DROPOFF.x, 0, DROPOFF.z);
+  handoff.group.position.set(HANDOFF.x, 0, HANDOFF.z);
   if (!lv) return;
   const pilotLayout = SLOT_LAYOUTS[lv.id];
   const offsets = PARKING_LAYOUTS[lv.id] || PARKING_LAYOUTS[1];

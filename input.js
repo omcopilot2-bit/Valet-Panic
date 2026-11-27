@@ -18,6 +18,7 @@ const mobileControlsElement = $('#mobileControls');
 /* ---------- steering style: the wheel (default) or left / right buttons, chosen in the pause menu ---------- */
 const STEER_KEY = 'valetSteer';
 let steerMode = (() => { try { return localStorage.getItem(STEER_KEY) === 'buttons' ? 'buttons' : 'wheel'; } catch (e) { return 'wheel'; } })();
+document.body.dataset.steer = steerMode;
 const steerHeld = { left: false, right: false };
 export const getSteerMode = () => steerMode;
 export function setSteerMode(mode) {

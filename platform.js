@@ -1,6 +1,16 @@
 // CrazyGames SDK wrapper. Every call is a safe no-op when the SDK is absent (local play, blocked script,
 // other hosts), so the game runs identically with or without it. Load it with initPlatform() at boot.
 const SDK_URL = 'https://sdk.crazygames.com/crazygames-sdk-v3.js';
+const SDK_INIT_TIMEOUT_MS = 8000;
+const USER_LOOKUP_TIMEOUT_MS = 4000;
+
+function withTimeout(promise, timeoutMs, message) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
 
 // The SDK is only requested when the game is hosted on (or embedded by) CrazyGames, or with ?sdk in the URL for testing.
 // On any other host nothing is fetched from a third party.
@@ -38,7 +48,7 @@ export async function initPlatform() {
       console.error('Could not load the CrazyGames SDK; continuing without platform services.');
       return false;
     }
-    await window.CrazyGames.SDK.init();
+    await withTimeout(window.CrazyGames.SDK.init(), SDK_INIT_TIMEOUT_MS, 'CrazyGames SDK initialization timed out');
     sdk = window.CrazyGames.SDK;
     if (playing && sdk.game && sdk.game.gameplayStart) sdk.game.gameplayStart();
     try {
@@ -60,7 +70,7 @@ export const isReady = () => !!sdk;
 
 export async function isGuestUser() {
   if (!sdk || !sdk.user || typeof sdk.user.getUser !== 'function') return false;
-  try { return (await sdk.user.getUser()) === null; }
+  try { return (await withTimeout(sdk.user.getUser(), USER_LOOKUP_TIMEOUT_MS, 'CrazyGames user lookup timed out')) === null; }
   catch (e) {
     console.error('Could not determine CrazyGames account state; skipping local-save migration', e);
     return false;

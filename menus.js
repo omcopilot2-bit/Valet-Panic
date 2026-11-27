@@ -12,6 +12,8 @@ import { G, keys, rush, tut, tutorial } from './state.js';
 import { venueName } from './venues.js';
 import { setBayTheme } from './world.js';
 
+let titleLoadError = '';
+
 /* ---------- end-screen helpers ---------- */
 // "▲ New best" or "$N short of your best" so a run always ends with a target for the next one.
 export function deltaLine(sc, prev, record) {
@@ -132,12 +134,16 @@ export function showTitle() {
 function buildPause() {
   G.pauseOverlay = document.createElement('div');
   G.pauseOverlay.className = 'overlay hide';
-  G.pauseOverlay.innerHTML = `<div class="hero"><div class="hero-eyebrow">NOCTURNE HOTEL · ON BREAK</div><h1>Shift <em>paused.</em></h1><p>The guests can wait a moment. Your clock is stopped.</p><button class="play" id="resume">Resume</button><button class="play ghost" id="steerToggle" style="display:none" aria-pressed="false">Steering: Wheel</button><button class="play ghost" id="skipTut" style="display:none">Skip tutorial</button><button class="play ghost" id="pauseSceneLab" style="display:none">Choose another scene</button><button class="play ghost" id="pauseMenu">Main menu</button><div class="hero-foot">P OR THE PAUSE BUTTON TO RESUME</div></div>`;
+  G.pauseOverlay.innerHTML = `<div class="hero"><div class="hero-eyebrow">NOCTURNE HOTEL · ON BREAK</div><h1>Shift <em>paused.</em></h1><p>The guests can wait a moment. Your clock is stopped.</p><button class="play" id="resume">Resume</button><p class="steer-label">STEERING LAYOUT</p><button class="play ghost" id="steerWheel" aria-pressed="false">Steering Wheel</button><button class="play ghost" id="steerButtons" aria-pressed="false">Steering Buttons ◀ ▶</button><button class="play ghost" id="skipTut" style="display:none">Skip tutorial</button><button class="play ghost" id="pauseSceneLab" style="display:none">Choose another scene</button><button class="play ghost" id="pauseMenu">Main menu</button><div class="hero-foot">P OR THE PAUSE BUTTON TO RESUME</div></div>`;
   document.body.appendChild(G.pauseOverlay);
   G.pauseOverlay.querySelector('#resume').addEventListener('click', () => setPaused(false));
-  G.pauseOverlay.querySelector('#steerToggle').addEventListener('click', () => {
-    setSteerMode(getSteerMode() === 'wheel' ? 'buttons' : 'wheel');
-    renderSteerToggle();
+  G.pauseOverlay.querySelector('#steerWheel').addEventListener('click', () => {
+    setSteerMode('wheel');
+    renderSteerOptions();
+  });
+  G.pauseOverlay.querySelector('#steerButtons').addEventListener('click', () => {
+    setSteerMode('buttons');
+    renderSteerOptions();
   });
   G.pauseOverlay.querySelector('#pauseMenu').addEventListener('click', () => {
     G.pauseOverlay.classList.add('hide');
@@ -161,14 +167,11 @@ function buildPause() {
   });
 }
 
-// The steering choice only matters on touch screens, so the toggle only shows there.
-function renderSteerToggle() {
-  const b = G.pauseOverlay && G.pauseOverlay.querySelector('#steerToggle');
-  if (!b) return;
+function renderSteerOptions() {
+  if (!G.pauseOverlay) return;
   const buttons = getSteerMode() === 'buttons';
-  b.style.display = '';   // always show; to restore touch-only: touch ? '' : 'none'
-  b.textContent = buttons ? 'Steering: ◀ ▶ Buttons' : 'Steering: Wheel';
-  b.setAttribute('aria-pressed', String(buttons));
+  G.pauseOverlay.querySelector('#steerWheel').setAttribute('aria-pressed', String(!buttons));
+  G.pauseOverlay.querySelector('#steerButtons').setAttribute('aria-pressed', String(buttons));
 }
 
 export function setPaused(p) {
@@ -180,7 +183,7 @@ export function setPaused(p) {
   if (!G.pauseOverlay) buildPause();
   G.pauseOverlay.classList.toggle('hide', !p);
   G.pauseOverlay.querySelector('#skipTut').style.display = tutorial.on ? '' : 'none';
-  renderSteerToggle();
+  renderSteerOptions();
   G.pauseOverlay.querySelector('#pauseSceneLab').style.display = rush.sceneLab ? '' : 'none';
   audio.pause(p);
 }
@@ -203,16 +206,22 @@ export function addPauseUI() {
 }
 
 export function setTitleButtons(savesReady = true) {
-  const ready = savesReady && modelCache.size > 0;
+  const ready = !titleLoadError && savesReady && modelCache.size > 0;
+  const waiting = titleLoadError || 'Loading…';
   const a = $('#start'), b = $('#startRush');
   const log = $('#logBtn');
   const sceneLab = $('#sceneLabBtn');
-  if (a) a.textContent = ready ? 'Memory' : 'Loading…';
-  if (b) b.textContent = ready ? 'Duel' : 'Loading…';
+  if (a) a.textContent = ready ? 'Memory' : waiting;
+  if (b) b.textContent = ready ? 'Duel' : waiting;
   document.querySelectorAll('#start, #startRush, #tutorialBtn, #levelsBtn, #locker, #logBtn, #sceneLabBtn')
     .forEach((el) => { el.disabled = !ready; });
   if (log) log.hidden = !new URLSearchParams(location.search).has('debug');
   if (sceneLab) sceneLab.hidden = !new URLSearchParams(location.search).has('debug');
+}
+
+export function setTitleLoadError(message) {
+  titleLoadError = message;
+  setTitleButtons(false);
 }
 
 // The shift the Shifts button plays: the first unlocked one with no stars yet, else the first not at 3 stars.

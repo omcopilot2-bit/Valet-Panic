@@ -189,6 +189,7 @@ It cannot test driving feel, collisions, player-input feel or visuals.
 - [AmbientCG Net 004 A](https://ambientcg.com/a/Net004A) opacity map for Cone Alley's green construction safety net, CC0 1.0 (`assets/ambientcg-net/Net004A_Opacity.png`).
 - Three.js r187 and GLTF loader utilities, MIT (`assets/three/LICENSE`).
 - [Font Awesome Free Bullhorn](https://github.com/FortAwesome/Font-Awesome/blob/6.x/svgs/solid/bullhorn.svg), by Fonticons, Inc., CC BY 4.0 (`assets/ui/bullhorn.svg`).
+- Sports car steering wheel icon: <a href='https://pngtree.com/freepng/sports-car-steering-wheel-icon-flat-style_5254985.html'>png image from pngtree.com/</a> (`assets/ui/steering-wheel-pngtree.png`).
 - Sound effects: CC0 (Kenney, plus Freesound originals via OpenTTD OpenSFX); sources in `assets/sounds/CREDITS.txt`.
 - All game assets, including the Fredoka and Nunito UI fonts, are bundled locally. System fonts (Trebuchet MS / Segoe UI / system-ui) remain as fallbacks.
 
